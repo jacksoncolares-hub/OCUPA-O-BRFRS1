@@ -1,17 +1,31 @@
-# BRFRS1 V32 Ultra Leve
+# BRFRS1 — Projeto completo recriado
 
-- Heat Map e 3D são páginas separadas.
-- `heatmap.html` não carrega Three.js.
-- O Heat Map usa uma rua por linha, níveis em colunas e total da rua.
-- O 3D renderiza apenas uma zona e um nível por vez.
-- A página inicial abre o Heat Map.
+## Arquivos principais
+- `index.html`: abre o Heat Map.
+- `heatmap.html`: painel gerencial leve.
+- `3d.html`: visualização 3D separada.
+- `data.json`: base local para o dashboard funcionar imediatamente.
+- `config.js`: conexão opcional com o Google Sheets via Apps Script.
+- `Code.gs`: código do Apps Script.
 
-Publicação:
+## Publicação no GitHub
+Copie todo o conteúdo desta pasta para:
+
+`C:\Users\SPXBR40986\Desktop\OCUPA-O-BRFRS1`
+
+Depois execute dentro da pasta:
 
 ```cmd
+git init
+git branch -M main
+git remote remove origin
+git remote add origin https://github.com/jacksoncolares-hub/OCUPA-O-BRFRS1.git
 git add .
-git commit -m "Instala V32 ultra leve"
-git push origin main
+git commit -m "Recria dashboard BRFRS1 completo"
+git push -u origin main --force
 ```
 
-Abra `?v=32` e pressione Ctrl + F5.
+Se `git remote remove origin` informar que o remote não existe, ignore e continue.
+
+## Google Sheets
+Publique o `Code.gs` como Web App e cole a URL terminada em `/exec` no arquivo `config.js`.
