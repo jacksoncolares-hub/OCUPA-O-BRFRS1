@@ -1,0 +1,143 @@
+
+window.ExcelImport=(()=>{
+  const aliases={
+    location:['location id','location','endereco','endereço','posicao','posição','storage location','bin location'],
+    zone:['zona','zone','area','área'],
+    status:['status end','status','location status','situacao','situação','estado','status da posicao','status da posição'],
+    pieces:['qtd pecas','qtd peças','quantidade pecas','quantidade peças','qty','quantity','pieces','unit qty','sku qty','quantidade','unidades']
+  };
+
+  function clean(v){
+    return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[_\-]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  }
+  function findHeader(headers,candidates){
+    for(const c of candidates){const i=headers.indexOf(clean(c));if(i>=0)return i}
+    for(const c of candidates){const cc=clean(c),i=headers.findIndex(h=>h.includes(cc));if(i>=0)return i}
+    return -1;
+  }
+  function mapColumns(rawHeaders){
+    const h=rawHeaders.map(clean);
+    return{
+      location:findHeader(h,aliases.location),
+      zone:findHeader(h,aliases.zone),
+      status:findHeader(h,aliases.status),
+      pieces:findHeader(h,aliases.pieces)
+    };
+  }
+  function parseLocation(locationId,zoneCell){
+    const raw=String(locationId||'').trim().toUpperCase();if(!raw)return null;
+    const parts=raw.replace(/[\/\\|_]+/g,'-').split('-').map(x=>x.trim()).filter(Boolean);
+    let zone=String(zoneCell||'').trim().toUpperCase(),road=null,level=null;
+    if(parts.length>=4){const t=parts.slice(-4);if(!zone)zone=t[0];road=parseInt(t[1],10);level=parseInt(t[2],10)}
+    if((!zone||!Number.isFinite(road)||!Number.isFinite(level))&&parts.length>=3){
+      const zi=parts.findIndex(p=>/^[A-Z]{1,3}$/.test(p));
+      if(zi>=0&&parts.length>zi+2){zone=zone||parts[zi];road=parseInt(parts[zi+1],10);level=parseInt(parts[zi+2],10)}
+    }
+    zone=String(zone||'').replace(/[^A-Z0-9]/g,'');
+    return zone&&Number.isFinite(road)&&Number.isFinite(level)?{zone,road,level}:null;
+  }
+  function num(v){
+    if(typeof v==='number')return Number.isFinite(v)?v:0;
+    let t=String(v??'').trim().replace(/\s/g,'');if(!t)return 0;
+    if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');else t=t.replace(/,/g,'');
+    t=t.replace(/[^\d.\-]/g,'');const n=Number(t);return Number.isFinite(n)?n:0;
+  }
+  function state(statusValue,pieces){
+    const s=clean(statusValue);
+    if(s.includes('bloq')||s.includes('block')||s.includes('disable')||s.includes('inativo'))return'bloqueado';
+    if(s.includes('ocup')||s.includes('occupied')||s.includes('full')||s.includes('used'))return'ocupado';
+    if(s.includes('disp')||s.includes('avail')||s.includes('empty')||s.includes('livre')||s.includes('vazio'))return'disponivel';
+    return Number(pieces||0)>0?'ocupado':'disponivel';
+  }
+  function increment(target,key,zone,road,level,st,pieces){
+    if(!target[key])target[key]={Zona:zone,rua_num:+road||0,nivel:+level||0,total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0};
+    target[key].total++;target[key][st]++;target[key].qtd_pecas+=Number(pieces||0);
+  }
+  function final(o){
+    const usable=(+o.ocupado||0)+(+o.disponivel||0);
+    return{Zona:o.Zona,rua_num:+o.rua_num||0,nivel:+o.nivel||0,total:+o.total||0,ocupado:+o.ocupado||0,
+      disponivel:+o.disponivel||0,bloqueado:+o.bloqueado||0,
+      occ_pct:usable>0?Math.round((1000*(+o.ocupado||0))/usable)/10:null,
+      qtd_pecas:Math.round((+o.qtd_pecas||0)*100)/100};
+  }
+  function zoneSort(a,b){
+    const order={A:1,B:2,HV:3,S:4},za=typeof a==='string'?a:a.Zona,zb=typeof b==='string'?b:b.Zona;
+    return(order[za]||99)-(order[zb]||99)||String(za).localeCompare(String(zb));
+  }
+  function aggregate(rows,sheetName,fileName,onProgress){
+    if(!rows?.length)throw new Error('A aba selecionada está vazia.');
+    const headers=rows[0].map(v=>String(v??''));
+    const map=mapColumns(headers);
+    if(map.location<0)throw new Error('Não encontrei a coluna de localização. Cabeçalhos: '+headers.join(' | '));
+
+    const zoneAgg={},roadAgg={},cellAgg={},metaCalc={};
+    let valid=0,ignored=0;
+    const total=Math.max(1,rows.length-1);
+
+    for(let i=1;i<rows.length;i++){
+      const row=rows[i]||[];
+      if(!row.some(v=>String(v??'').trim()!==''))continue;
+      const loc=String(row[map.location]??'').trim();
+      const parsed=parseLocation(loc,map.zone>=0?row[map.zone]:'');
+      if(!parsed){ignored++;continue}
+      const pieces=map.pieces>=0?num(row[map.pieces]):0;
+      const st=state(map.status>=0?row[map.status]:'',pieces);
+      const {zone,road,level}=parsed;
+      increment(zoneAgg,zone,zone,road,level,st,pieces);
+      increment(roadAgg,`${zone}|${road}`,zone,road,level,st,pieces);
+      increment(cellAgg,`${zone}|${road}|${level}`,zone,road,level,st,pieces);
+      if(!metaCalc[zone])metaCalc[zone]={roads:{},levels:{},roadMin:road,roadMax:road};
+      metaCalc[zone].roads[road]=true;metaCalc[zone].levels[level]=true;
+      metaCalc[zone].roadMin=Math.min(metaCalc[zone].roadMin,road);
+      metaCalc[zone].roadMax=Math.max(metaCalc[zone].roadMax,road);
+      valid++;
+      if(onProgress&&i%2000===0)onProgress(Math.round(i/total*90));
+    }
+
+    const zones=Object.keys(zoneAgg).sort(zoneSort).map(k=>final(zoneAgg[k]));
+    const corridors=Object.keys(roadAgg).map(k=>final(roadAgg[k])).sort((a,b)=>zoneSort(a,b)||a.rua_num-b.rua_num);
+    const cells=Object.keys(cellAgg).map(k=>final(cellAgg[k])).sort((a,b)=>zoneSort(a,b)||a.rua_num-b.rua_num||a.nivel-b.nivel);
+    const overall={Zona:'GERAL',rua_num:0,nivel:0,total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0};
+    zones.forEach(z=>['total','ocupado','disponivel','bloqueado','qtd_pecas'].forEach(k=>overall[k]+=Number(z[k]||0)));
+    const meta={};
+    const presets={A:{label:'Zona A · Bins de Separação',tipo:'bin'},B:{label:'Zona B · Porta-paletes',tipo:'pallet'},HV:{label:'Zona HV · Bins de Volume',tipo:'bin'},S:{label:'Zona S · Bins Especiais',tipo:'bin'}};
+    Object.keys(metaCalc).forEach(z=>{
+      const m=metaCalc[z],p=presets[z]||{};
+      meta[z]={label:p.label||`Zona ${z}`,tipo:p.tipo||'bin',ruas:Object.keys(m.roads).length,
+        niveis:Math.max(...Object.keys(m.levels).map(Number)),rua_min:m.roadMin,rua_max:m.roadMax};
+    });
+    onProgress?.(100);
+    return{ok:true,generated_at:new Date().toLocaleString('pt-BR'),source:{type:'manual_excel',file_name:fileName,sheet_name:sheetName,valid_rows:valid,ignored_rows:ignored},
+      overall:final(overall),zones,corridors,cells,stock_trend:[],meta,
+      assumptions:['Ocupação = ocupado ÷ (ocupado + disponível).','Posições bloqueadas ficam fora do percentual.','Dados importados localmente do Excel.']};
+  }
+
+  async function read(file,{sheetName,onProgress}={}){
+    if(!window.XLSX)throw new Error('Biblioteca de Excel não carregada. Verifique a internet e tente novamente.');
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(!['xlsx','xls','xlsm','csv'].includes(ext))throw new Error('Formato não suportado. Use .xlsx, .xls, .xlsm ou .csv.');
+    onProgress?.(5,'Lendo arquivo');
+    const buffer=await file.arrayBuffer();
+    onProgress?.(18,'Abrindo planilha');
+    const wb=XLSX.read(buffer,{type:'array',cellDates:false,dense:true});
+    const chosen=sheetName&&wb.SheetNames.includes(sheetName)?sheetName:findBestSheet(wb);
+    const ws=wb.Sheets[chosen];
+    onProgress?.(25,`Processando aba ${chosen}`);
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+    const data=aggregate(rows,chosen,file.name,p=>onProgress?.(25+Math.round(p*.7),'Consolidando posições'));
+    return{data,sheetNames:wb.SheetNames,selectedSheet:chosen};
+  }
+  function findBestSheet(wb){
+    let best=wb.SheetNames[0],score=-1;
+    for(const name of wb.SheetNames){
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:'',range:0});
+      if(!rows.length)continue;
+      const map=mapColumns(rows[0]||[]);
+      const s=(map.location>=0?100000:0)+rows.length;
+      if(s>score){score=s;best=name}
+    }
+    return best;
+  }
+  return{read};
+})();

@@ -3,9 +3,9 @@
 <body><div class="app">
 <aside><div class="brand"><b>S</b><div><strong>BRFRS1</strong><small>Occupancy Center</small></div></div><nav><a class="active" href="heatmap.html">▦ <span>Heat Map</span></a><a href="3d.html">◇ <span>Mapa 3D</span></a></nav><p class="aside-note">A planilha pode permanecer privada.</p></aside>
 <main>
-<header><div><em>LOGÍSTICA & SUPPLY CHAIN</em><h1>Heat Map Gerencial</h1><p>Ocupação por zona, rua e nível.</p></div><div class="header-actions"><div id="status" class="status loading"><i></i>Carregando</div><button id="refreshBtn">↻</button></div></header>
+<header><div><em>LOGÍSTICA & SUPPLY CHAIN</em><h1>Heat Map Gerencial</h1><p>Ocupação por zona, rua e nível.</p></div><div class="header-actions"><div id="sourceBadge" class="source-badge">Fonte: verificando...</div><div id="status" class="status loading"><i></i>Carregando</div><button id="refreshBtn">↻</button></div></header>
 <section id="kpis" class="kpis"></section>
-<section class="toolbar card"><label>Zona<select id="zoneSelect"></select></label><label class="grow">Pesquisar<input id="searchInput" placeholder="Rua 23 ou A-23-05-018"></label><button id="exportBtn" class="primary">Exportar PDF</button></section>
+<section class="toolbar card"><label>Zona<select id="zoneSelect"></select></label><label class="grow">Pesquisar<input id="searchInput" placeholder="Rua 23 ou A-23-05-018"></label><button id="importExcelBtn" class="excel-btn">📤 Importar Excel</button><button id="exportBtn" class="primary">Exportar PDF</button></section>
 <section class="layout">
 <div class="card heat-card"><div class="card-title"><div><h2>Ocupação por rua e nível</h2><p>Clique em uma célula para detalhes.</p></div><div class="scale"><span>0%</span><i></i><span>100%</span></div></div><div id="heatmap" class="heatmap"></div></div>
 <div class="right">
@@ -14,4 +14,31 @@
 <div class="card"><div class="card-title"><h2>Legenda</h2></div><div class="legend"><span><i class="idle"></i>0–39%</span><span><i class="healthy"></i>40–74%</span><span><i class="alert"></i>75–89%</span><span><i class="critical"></i>90–100%</span><span><i class="blocked"></i>Sem cálculo</span></div></div>
 </div></section>
 <section class="card detail"><div class="card-title"><div><h2>Detalhes da seleção</h2><p id="detailSubtitle">Clique em uma célula.</p></div></div><div id="detailGrid" class="detail-grid empty">Nenhuma célula selecionada.</div></section>
-</main></div><div id="toast" class="toast"></div><script src="js/api.js"></script><script src="js/heatmap.js"></script></body></html>
+</main></div><div id="toast" class="toast"></div><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="js/api.js"></script><script src="js/excel-import.js"></script><script src="js/heatmap.js"></script>
+<div id="excelModal" class="modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close-modal></div>
+  <div class="modal-panel">
+    <button class="modal-close" data-close-modal>×</button>
+    <div class="upload-icon">📤</div>
+    <h2>Atualizar dados manualmente</h2>
+    <p>Selecione ou arraste o arquivo exportado do WMS. O processamento acontece no navegador e o arquivo não é enviado para o GitHub.</p>
+    <div id="dropZone" class="drop-zone">
+      <input id="excelFileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden>
+      <strong>Arraste a planilha aqui</strong>
+      <span>ou</span>
+      <button id="chooseExcelBtn" type="button">Selecionar arquivo</button>
+      <small>.xlsx, .xls, .xlsm ou .csv</small>
+    </div>
+    <div id="fileSelected" class="file-selected hidden"></div>
+    <div id="importProgress" class="import-progress hidden">
+      <div class="progress-head"><span id="progressText">Preparando...</span><b id="progressPct">0%</b></div>
+      <div class="progress-track"><i id="progressBar"></i></div>
+    </div>
+    <div id="importResult" class="import-result hidden"></div>
+    <div class="modal-actions">
+      <button id="clearManualBtn" class="danger-soft" type="button">Voltar ao Google Sheets</button>
+      <button id="processExcelBtn" class="primary" type="button" disabled>Atualizar Dashboard</button>
+    </div>
+  </div>
+</div>
+<script src="js/import-ui.js"></script></body></html>
