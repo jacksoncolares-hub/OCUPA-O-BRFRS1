@@ -95,7 +95,7 @@
         'success'
       );
       refreshDialogSource();
-      window.updateSourceBadge?.();
+      window.updateMainSourceBadge?.();
 
       setTimeout(()=>location.reload(),1100);
     }catch(error){

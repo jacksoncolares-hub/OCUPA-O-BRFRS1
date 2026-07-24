@@ -47,6 +47,7 @@ window.WMS=(()=>{
     d.zones=Array.isArray(d.zones)?d.zones:[];
     d.corridors=Array.isArray(d.corridors)?d.corridors:[];
     d.cells=Array.isArray(d.cells)?d.cells:[];
+    d.positions=Array.isArray(d.positions)?d.positions:[];
     d.meta=d.meta||{};d.overall=d.overall||{};
     return d;
   }

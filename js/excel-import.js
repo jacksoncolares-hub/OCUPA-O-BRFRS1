@@ -143,6 +143,7 @@ window.ExcelImport=(()=>{
     }
 
     const zoneAgg={},roadAgg={},cellAgg={},metaCalc={};
+    const positions=[];
     let valid=0,ignored=0;
     const total=Math.max(1,rows.length-1);
 
@@ -160,11 +161,38 @@ window.ExcelImport=(()=>{
       if(!ALLOWED_ZONES.includes(zone)){ignored++;continue}
       const pieces=map.pieces>=0?num(row[map.pieces]):0;
       const volumeLimit=num(row[map.volumeLimit]);
-      const volumeOccupied=num(row[map.volumeOccupied]);
+
+      /*
+        Na planilha real:
+        - Volume limit(cm3) está em cm³.
+        - Volume occupied está em m³/CBM.
+        Portanto, convertemos Volume occupied para cm³.
+      */
+      const volumeOccupiedRaw=num(row[map.volumeOccupied]);
+      const volumeOccupied=volumeOccupiedRaw*1000000;
+
       const st=state(map.status>=0?row[map.status]:'',pieces);
       increment(zoneAgg,zone,zone,road,level,st,pieces,volumeLimit,volumeOccupied);
       increment(roadAgg,`${zone}|${road}`,zone,road,level,st,pieces,volumeLimit,volumeOccupied);
       increment(cellAgg,`${zone}|${road}|${level}`,zone,road,level,st,pieces,volumeLimit,volumeOccupied);
+
+      const locParts=loc.toUpperCase().split('-');
+      const moduleNumber=locParts.length>=6?parseInt(locParts[3],10):0;
+      const positionNumber=locParts.length>=6?parseInt(locParts[5],10):0;
+      positions.push({
+        Zona:zone,
+        rua_num:road,
+        nivel:level,
+        modulo:Number.isFinite(moduleNumber)?moduleNumber:0,
+        posicao:Number.isFinite(positionNumber)?positionNumber:0,
+        location_id:loc,
+        status:st,
+        qtd_pecas:pieces,
+        volume_limit:volumeLimit,
+        volume_occupied:volumeOccupied,
+        volume_available:Math.max(0,volumeLimit-volumeOccupied),
+        occ_pct:volumeLimit>0?Math.round((volumeOccupied/volumeLimit)*1000)/10:null
+      });
       if(!metaCalc[zone])metaCalc[zone]={roads:{},levels:{},roadMin:road,roadMax:road};
       metaCalc[zone].roads[road]=true;metaCalc[zone].levels[level]=true;
       metaCalc[zone].roadMin=Math.min(metaCalc[zone].roadMin,road);
@@ -192,9 +220,10 @@ window.ExcelImport=(()=>{
     });
     onProgress?.(100);
     return{ok:true,generated_at:new Date().toLocaleString('pt-BR'),source:{type:'manual_excel',file_name:fileName,sheet_name:sheetName,valid_rows:valid,ignored_rows:ignored},
-      overall:final(overall),zones,corridors,cells,stock_trend:[],meta,
+      overall:final(overall),zones,corridors,cells,positions,stock_trend:[],meta,
       assumptions:[
-        'Ocupação = soma de Volume occupied ÷ soma de Volume limit(cm3).',
+        'Volume occupied foi convertido de m³/CBM para cm³ antes do cálculo.',
+        'Ocupação = soma de Volume occupied em cm³ ÷ soma de Volume limit(cm3).',
         'Somente as zonas A, B, HV e HS são consideradas.',
         'Dados importados localmente do Excel.'
       ]};

@@ -86,3 +86,24 @@ Novidades:
 
 Observação:
 O JSON atual é consolidado por rua e nível. A janela distribui visualmente as posições com base no total de cada nível. Para mostrar o valor exato de cada endereço individual, será necessária uma versão da API que também envie as linhas brutas das posições.
+
+
+## Correção do volume (20260724-7)
+
+Após validar a planilha real, foi identificado que:
+- `Volume limit(cm3)` está em cm³.
+- `Volume occupied` está em m³/CBM.
+
+O sistema agora converte:
+
+`Volume occupied × 1.000.000`
+
+antes de calcular:
+
+`Ocupação = Volume occupied em cm³ ÷ Volume limit(cm3) × 100`
+
+Também:
+- salva todas as posições individuais do Excel;
+- a análise por rua mostra os endereços reais;
+- corrige a identificação da fonte atual;
+- corrige os textos do ranking.

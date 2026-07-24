@@ -37,7 +37,7 @@ async function load(force=false){
     renderAll();
     const src=WMS.getSourceInfo();
     status('ok',src.type==='excel'?'Excel manual carregado':(WMS.config.SHEET_API_URL?'Google Sheets conectado':'Modo local'));
-    setTimeout(()=>window.updateSourceBadge?.(),0);
+    updateMainSourceBadge();
   }catch(e){
     console.error(e);
     status('error','Falha ao carregar');
@@ -230,6 +230,23 @@ function parse(q){
   return r?{road:+r[1]}:{};
 }
 
+
+function updateMainSourceBadge(){
+  const el=$('#sourceBadge');
+  if(!el)return;
+  const source=WMS.getSourceInfo?.()||{};
+  if(source.type==='excel'){
+    el.textContent=`Excel manual${source.fileName?` · ${source.fileName}`:''}`;
+    el.className='source-badge excel';
+  }else if(source.type==='sheets'){
+    el.textContent='Google Sheets';
+    el.className='source-badge sheets';
+  }else{
+    el.textContent=source.label||'Arquivo local';
+    el.className='source-badge';
+  }
+}
+
 function pct(v){return v==null?'—':`${Number(v).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`}
 function pad(v){return String(+v).padStart(2,'0')}
 function status(c,t){$('#status').className=`status ${c}`;$('#status').innerHTML=`<i></i>${t}`}
@@ -367,15 +384,32 @@ function renderRoadExplorer(){
 }
 
 function buildSyntheticPositions(cellsForRoad){
-  /*
-    O JSON consolidado atual contém rua e nível, não todas as linhas brutas.
-    Para a visualização detalhada, cada célula é distribuída em cartões de posição
-    proporcionais ao total informado naquele nível.
-  */
+  const exact=(state.data.positions||[])
+    .filter(p=>
+      String(p.Zona)===roadExplorerState.zone &&
+      Number(p.rua_num)===Number(roadExplorerState.road)
+    )
+    .map(p=>({
+      zone:p.Zona,
+      road:Number(p.rua_num),
+      level:Number(p.nivel),
+      module:Number(p.modulo),
+      position:Number(p.posicao),
+      positionId:p.location_id,
+      occupied:String(p.status)==='ocupado',
+      status:p.status,
+      occupancy:Number(p.occ_pct)||0,
+      volumeLimit:Number(p.volume_limit)||0,
+      volumeOccupied:Number(p.volume_occupied)||0
+    }));
+
+  if(exact.length)return exact;
+
+  // Compatibilidade com dados antigos que ainda não possuem posições individuais.
   const result=[];
   cellsForRoad.forEach(cell=>{
     const total=Math.max(1,Number(cell.total)||1);
-    const occupiedRatio=(Number(cell.occ_pct)||0)/100;
+    const occupiedRatio=Math.min(1,Math.max(0,(Number(cell.occ_pct)||0)/100));
     const modules=Math.max(1,Math.ceil(total/56));
 
     for(let i=0;i<total;i++){
@@ -390,6 +424,7 @@ function buildSyntheticPositions(cellsForRoad){
         position,
         positionId:`${cell.Zona}-${pad(cell.rua_num)}-${pad(module)}-${pad(cell.nivel)}-${String(position).padStart(3,'0')}`,
         occupied,
+        status:occupied?'ocupado':'disponivel',
         occupancy:Number(cell.occ_pct)||0,
         volumeLimit:Number(cell.volume_limit||0)/total,
         volumeOccupied:Number(cell.volume_occupied||0)/total
@@ -420,7 +455,7 @@ function renderRoadGrid(positions){
       </div>
       <div class="position-cards">
         ${items.map(p=>`
-          <button class="position-card ${WMS.cls(p.occupancy)}" title="${p.positionId}">
+          <button class="position-card ${p.status==='bloqueado'?'blocked':WMS.cls(p.occupancy)}" title="${p.positionId}">
             <strong>${String(p.position).padStart(3,'0')}</strong>
             <span>${p.occupancy.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</span>
           </button>`).join('')}
@@ -456,8 +491,10 @@ function renderRoadTable(positions){
             <td>${pct(p.occupancy)}</td>
             <td>${fmtVolume(p.volumeOccupied)}</td>
             <td>${fmtVolume(p.volumeLimit)}</td>
-            <td><span class="table-status ${WMS.cls(p.occupancy)}">${p.occupied?'Ocupada':'Disponível'}</span></td>
+            <td><span class="table-status ${p.status==='bloqueado'?'blocked':WMS.cls(p.occupancy)}">${p.status==='bloqueado'?'Bloqueada':(p.occupied?'Ocupada':'Disponível')}</span></td>
           </tr>`).join('')}
       </tbody>
     </table>`;
 }
+
+window.updateMainSourceBadge=updateMainSourceBadge;

@@ -505,3 +505,12 @@ body.modern-dashboard{
   .modern-kpis,.road-summary-cards{grid-template-columns:1fr 1fr}
   .insights-column{grid-template-columns:1fr}
 }
+
+.ranking-list .rank-row strong,
+.ranking-list .rank-row b{color:#0f172a!important}
+.ranking-list .rank-row>div:nth-child(2){min-width:0}
+.ranking-list .rank-row strong{
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.table-status.blocked{background:#e2e8f0;color:#64748b}
+.position-card.blocked{background:#e2e8f0;border-color:#cbd5e1;color:#64748b}
