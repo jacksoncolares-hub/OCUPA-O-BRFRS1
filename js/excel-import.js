@@ -4,7 +4,8 @@ window.ExcelImport=(()=>{
     location:['location id','location','endereco','endereço','posicao','posição','storage location','bin location'],
     zone:['zona','zone','area','área'],
     status:['status end','status','location status','situacao','situação','estado','status da posicao','status da posição'],
-    pieces:['qtd pecas','qtd peças','quantidade pecas','quantidade peças','qty','quantity','pieces','unit qty','sku qty','quantidade','unidades']
+    pieces:['qtd pecas','qtd peças','quantidade pecas','quantidade peças','qty','quantity','pieces','unit qty','sku qty','quantidade','unidades'],
+    road:['pathway id','rua2','rua','corredor','aisle','pathway']
   };
 
   function clean(v){
@@ -22,20 +23,63 @@ window.ExcelImport=(()=>{
       location:findHeader(h,aliases.location),
       zone:findHeader(h,aliases.zone),
       status:findHeader(h,aliases.status),
-      pieces:findHeader(h,aliases.pieces)
+      pieces:findHeader(h,aliases.pieces),
+      road:findHeader(h,aliases.road)
     };
   }
-  function parseLocation(locationId,zoneCell){
-    const raw=String(locationId||'').trim().toUpperCase();if(!raw)return null;
-    const parts=raw.replace(/[\/\\|_]+/g,'-').split('-').map(x=>x.trim()).filter(Boolean);
-    let zone=String(zoneCell||'').trim().toUpperCase(),road=null,level=null;
-    if(parts.length>=4){const t=parts.slice(-4);if(!zone)zone=t[0];road=parseInt(t[1],10);level=parseInt(t[2],10)}
-    if((!zone||!Number.isFinite(road)||!Number.isFinite(level))&&parts.length>=3){
-      const zi=parts.findIndex(p=>/^[A-Z]{1,3}$/.test(p));
-      if(zi>=0&&parts.length>zi+2){zone=zone||parts[zi];road=parseInt(parts[zi+1],10);level=parseInt(parts[zi+2],10)}
+  function parseLocation(locationId,zoneCell,roadCell){
+    const raw=String(locationId||'').trim().toUpperCase();
+    if(!raw)return null;
+
+    const parts=raw
+      .replace(/[\/\\|_]+/g,'-')
+      .split('-')
+      .map(x=>x.trim())
+      .filter(Boolean);
+
+    let zone=String(zoneCell||'').trim().toUpperCase();
+    let road=parseInt(String(roadCell??'').replace(/\D/g,''),10);
+    let level=null;
+
+    /*
+      Formato real da planilha BRFRS1:
+      BRFRS1-A-23-05-3-018
+             │  │  │  │
+             │  │  │  └ posição
+             │  │  └ nível
+             │  └ módulo/bay
+             └ rua/pathway
+
+      Portanto:
+      zona = bloco após BRFRS1
+      rua  = primeiro bloco após a zona
+      nível = terceiro bloco após a zona
+    */
+    const zoneIndex=parts.findIndex((part,index)=>
+      index>0 &&
+      /^[A-Z][A-Z0-9]{0,3}$/.test(part) &&
+      parts.length>index+4
+    );
+
+    if(zoneIndex>=0){
+      if(!zone)zone=parts[zoneIndex];
+      if(!Number.isFinite(road))road=parseInt(parts[zoneIndex+1],10);
+      level=parseInt(parts[zoneIndex+3],10);
     }
+
+    // Fallback para formatos curtos, como A-23-05-3-018.
+    if((!zone||!Number.isFinite(road)||!Number.isFinite(level))&&parts.length>=5){
+      const start=parts.length-5;
+      if(!zone)zone=parts[start];
+      if(!Number.isFinite(road))road=parseInt(parts[start+1],10);
+      level=parseInt(parts[start+3],10);
+    }
+
     zone=String(zone||'').replace(/[^A-Z0-9]/g,'');
-    return zone&&Number.isFinite(road)&&Number.isFinite(level)?{zone,road,level}:null;
+
+    return zone&&Number.isFinite(road)&&Number.isFinite(level)
+      ?{zone,road,level}
+      :null;
   }
   function num(v){
     if(typeof v==='number')return Number.isFinite(v)?v:0;
@@ -79,7 +123,11 @@ window.ExcelImport=(()=>{
       const row=rows[i]||[];
       if(!row.some(v=>String(v??'').trim()!==''))continue;
       const loc=String(row[map.location]??'').trim();
-      const parsed=parseLocation(loc,map.zone>=0?row[map.zone]:'');
+      const parsed=parseLocation(
+        loc,
+        map.zone>=0?row[map.zone]:'',
+        map.road>=0?row[map.road]:''
+      );
       if(!parsed){ignored++;continue}
       const pieces=map.pieces>=0?num(row[map.pieces]):0;
       const st=state(map.status>=0?row[map.status]:'',pieces);

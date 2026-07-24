@@ -88,7 +88,11 @@ function buildDashboardData_() {
     if (!row.some(v => String(v).trim() !== '')) continue;
 
     const locationId = String(row[map.location] || '').trim();
-    const parsed = parseLocation_(locationId, map.zone >= 0 ? row[map.zone] : '');
+    const parsed = parseLocation_(
+      locationId,
+      map.zone >= 0 ? row[map.zone] : '',
+      map.road >= 0 ? row[map.road] : ''
+    );
 
     if (!parsed) {
       ignoredRows++;
@@ -191,7 +195,7 @@ function buildDashboardData_() {
     assumptions: [
       'Ocupação = ocupado ÷ (ocupado + disponível).',
       'Posições bloqueadas ficam fora do percentual de ocupação.',
-      'A localização é interpretada pelos quatro últimos blocos: zona, rua, nível e posição.'
+      'A localização é interpretada no padrão BRFRS1-ZONA-RUA-MÓDULO-NÍVEL-POSIÇÃO.'
     ]
   };
 }
@@ -276,7 +280,7 @@ function cleanHeader_(value) {
     .toLowerCase();
 }
 
-function parseLocation_(locationId, zoneCell) {
+function parseLocation_(locationId, zoneCell, roadCell) {
   const raw = String(locationId || '').trim().toUpperCase();
   if (!raw) return null;
 
@@ -287,26 +291,29 @@ function parseLocation_(locationId, zoneCell) {
     .filter(Boolean);
 
   let zone = String(zoneCell || '').trim().toUpperCase();
-  let road = null;
+  let road = parseInt(String(roadCell == null ? '' : roadCell).replace(/\D/g, ''), 10);
   let level = null;
 
-  // Formato mais comum: A-23-05-018
-  // Também aceita prefixo: BRFRS1-A-23-05-018
-  if (parts.length >= 4) {
-    const tail = parts.slice(-4);
-    if (!zone) zone = tail[0];
-    road = parseInt(tail[1], 10);
-    level = parseInt(tail[2], 10);
+  // Formato real: BRFRS1-A-23-05-3-018
+  // zona=A, rua=23, módulo=05, nível=3, posição=018.
+  const zoneIndex = parts.findIndex((part, index) =>
+    index > 0 &&
+    /^[A-Z][A-Z0-9]{0,3}$/.test(part) &&
+    parts.length > index + 4
+  );
+
+  if (zoneIndex >= 0) {
+    if (!zone) zone = parts[zoneIndex];
+    if (!Number.isFinite(road)) road = parseInt(parts[zoneIndex + 1], 10);
+    level = parseInt(parts[zoneIndex + 3], 10);
   }
 
-  // Fallback para formatos com zona em outra posição.
-  if ((!zone || !Number.isFinite(road) || !Number.isFinite(level)) && parts.length >= 3) {
-    const zoneIndex = parts.findIndex(p => /^[A-Z]{1,3}$/.test(p));
-    if (zoneIndex >= 0 && parts.length > zoneIndex + 2) {
-      zone = zone || parts[zoneIndex];
-      road = parseInt(parts[zoneIndex + 1], 10);
-      level = parseInt(parts[zoneIndex + 2], 10);
-    }
+  // Fallback para A-23-05-3-018.
+  if ((!zone || !Number.isFinite(road) || !Number.isFinite(level)) && parts.length >= 5) {
+    const first = parts.length - 5;
+    if (!zone) zone = parts[first];
+    if (!Number.isFinite(road)) road = parseInt(parts[first + 1], 10);
+    level = parseInt(parts[first + 3], 10);
   }
 
   zone = String(zone || '').replace(/[^A-Z0-9]/g, '');

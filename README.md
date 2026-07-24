@@ -40,3 +40,20 @@ Depois abra o GitHub Pages e pressione `Ctrl + F5`.
 - O restante do dashboard fica escurecido.
 - `Esc`, botão fechar e clique fora fecham a janela quando nenhuma importação está em andamento.
 - A janela exibe fonte atual, última atualização, arquivo escolhido, progresso e resultado.
+
+
+## Correção das ruas (20260724-4)
+A planilha enviada utiliza o padrão:
+
+`BRFRS1-ZONA-RUA-MÓDULO-NÍVEL-POSIÇÃO`
+
+Exemplo: `BRFRS1-A-23-05-3-018`
+
+Agora o sistema interpreta:
+- Zona: `A`
+- Rua: `23`
+- Módulo: `05`
+- Nível: `3`
+- Posição: `018`
+
+Também prioriza a coluna `Pathway ID` para identificar a rua.
