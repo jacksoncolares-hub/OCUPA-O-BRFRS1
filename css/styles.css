@@ -543,3 +543,176 @@ body.modern-dashboard{
 .insight-modern.success{border-left:3px solid #22c55e}.insight-modern.success .insight-icon{background:#dcfce7;color:#15803d}
 .insight-modern.primary{border-left:3px solid #2563eb}.insight-modern.info{border-left:3px solid #0ea5e9}.insight-modern.neutral{border-left:3px solid #94a3b8}
 @media(max-width:1100px){.modern-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.modern-kpis{grid-template-columns:1fr 1fr}}
+
+
+/* ===== Análise detalhada por rua — estilo operacional ===== */
+.road-dialog{
+  width:min(1180px,calc(100vw - 20px));
+  max-height:calc(100vh - 20px);
+  border-radius:0;
+  background:#f4f7fb;
+}
+.road-dialog-shell{min-height:100%}
+.road-dialog-header{
+  position:sticky;
+  top:0;
+  z-index:20;
+  padding:20px 26px;
+  background:linear-gradient(135deg,#10213a,#1a3559);
+  box-shadow:0 8px 22px rgba(15,23,42,.14);
+}
+.road-dialog-header h2{
+  font-size:25px;
+  letter-spacing:-.03em;
+}
+.road-dialog-header p{font-size:10px}
+.road-dialog-filters{
+  position:sticky;
+  top:103px;
+  z-index:18;
+  padding:14px 18px;
+  background:#fff;
+  box-shadow:0 6px 18px rgba(15,23,42,.05);
+}
+.road-summary-cards{
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  padding:15px 18px 13px;
+}
+.road-summary-card{
+  position:relative;
+  min-height:70px;
+  overflow:hidden;
+  padding:14px;
+  border-radius:14px;
+  background:linear-gradient(145deg,#fff,#f8fafc);
+  box-shadow:0 8px 20px rgba(15,23,42,.035);
+}
+.road-summary-card:before{
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:3px;
+  background:#2563eb;
+}
+.road-summary-card.percent:before{background:#2563eb}
+.road-summary-card.pieces:before{background:#0ea5e9}
+.road-summary-card.limit:before{background:#6366f1}
+.road-summary-card.available:before{background:#22c55e}
+.road-summary-card.positions:before{background:#64748b}
+.road-summary-card span{
+  position:relative;
+  z-index:2;
+  font-size:9px;
+}
+.road-summary-card strong{
+  position:relative;
+  z-index:2;
+  margin-top:8px;
+  font-size:20px;
+}
+.road-summary-card i{
+  position:absolute;
+  width:70px;
+  height:70px;
+  right:-20px;
+  bottom:-28px;
+  border-radius:50%;
+  background:rgba(37,99,235,.06);
+}
+.road-view-switch{
+  position:sticky;
+  top:174px;
+  z-index:17;
+  padding:0 18px 12px;
+  background:#f4f7fb;
+}
+.road-view-switch button{
+  min-width:150px;
+  min-height:40px;
+  font-size:11px;
+}
+.road-position-grid{
+  padding:0 18px 28px;
+}
+.position-group.operational-style{
+  border-radius:14px;
+  box-shadow:0 8px 24px rgba(15,23,42,.04);
+}
+.position-group.operational-style .position-group-header{
+  align-items:center;
+  padding:11px 13px;
+}
+.position-group.operational-style .position-group-header>div{
+  display:grid;
+  gap:3px;
+}
+.position-group.operational-style .position-group-header strong{
+  font-size:11px;
+}
+.position-group.operational-style .position-group-header small{
+  font-size:8px;
+  color:#8190a5;
+}
+.position-group.operational-style .position-cards{
+  grid-template-columns:repeat(auto-fill,minmax(58px,1fr));
+  gap:7px;
+  padding:10px;
+}
+.position-card.operational-position{
+  --position-fill:0%;
+  position:relative;
+  isolation:isolate;
+  min-height:54px;
+  overflow:hidden;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#e8eef5;
+  color:#334155;
+}
+.position-card.operational-position:before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:var(--position-fill);
+  z-index:-1;
+  transition:height .3s ease;
+}
+.position-card.operational-position.idle:before{background:#cbd5e1}
+.position-card.operational-position.healthy:before{background:linear-gradient(180deg,#bbf7d0,#4ade80)}
+.position-card.operational-position.alert:before{background:linear-gradient(180deg,#fde68a,#f59e0b)}
+.position-card.operational-position.critical:before{background:linear-gradient(180deg,#fecaca,#ef4444)}
+.position-card.operational-position.blocked:before{height:100%;background:#dbe2ea}
+.position-card.operational-position:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 16px rgba(15,23,42,.1);
+}
+.position-card.operational-position strong{
+  font-size:10px;
+  color:#334155;
+}
+.position-card.operational-position span{
+  font-size:8px;
+  font-weight:800;
+  color:#475569;
+}
+.position-card.operational-position small{
+  font-size:7px;
+  color:#64748b;
+}
+.road-position-table{
+  padding:0 18px 28px;
+}
+.road-position-table table{
+  border-radius:14px;
+  box-shadow:0 8px 24px rgba(15,23,42,.04);
+}
+.road-position-table tbody tr:hover{
+  background:#f8fafc;
+}
+@media(max-width:760px){
+  .road-summary-cards{grid-template-columns:1fr 1fr}
+  .road-dialog-filters{position:relative;top:auto}
+  .road-view-switch{position:relative;top:auto}
+}

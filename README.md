@@ -149,3 +149,17 @@ Exemplo:
 - Limite útil: 700 peças
 - Quantidade real em posições úteis: 350 peças
 - Ocupação: 50%
+
+
+## Análise detalhada por rua — estilo operacional (20260724-11)
+- Janela em tela ampla.
+- Cabeçalho e filtros fixos durante a rolagem.
+- Cards de resumo redesenhados.
+- Grade agrupada por nível e módulo.
+- Cada posição mostra:
+  - número da posição;
+  - percentual de ocupação;
+  - quantidade de peças;
+  - status bloqueado quando aplicável.
+- Preenchimento vertical por ocupação em cada posição.
+- Tabela detalhada com capacidade disponível.

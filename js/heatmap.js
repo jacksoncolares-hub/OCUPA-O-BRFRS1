@@ -404,16 +404,17 @@ function renderRoadExplorer(){
   roadExplorerState.rawPositions=positions;
 
   const summary=[
-    ['Ocupação da rua',pct(corridor?.occ_pct)],
-    ['Quantidade real útil',WMS.fmt(corridor?.real_pieces)],
-    ['Limite útil',WMS.fmt(corridor?.piece_limit)],
-    ['Capacidade disponível',WMS.fmt(corridor?.available_pieces)],
-    ['Posições utilizáveis',WMS.fmt(corridor?.usable_positions)]
+    ['Ocupação da rua',pct(corridor?.occ_pct),'percent'],
+    ['Quantidade real útil',WMS.fmt(corridor?.real_pieces),'pieces'],
+    ['Limite útil',WMS.fmt(corridor?.piece_limit),'limit'],
+    ['Capacidade disponível',WMS.fmt(corridor?.available_pieces),'available'],
+    ['Posições utilizáveis',WMS.fmt(corridor?.usable_positions),'positions']
   ];
-  $('#roadSummaryCards').innerHTML=summary.map(([label,value])=>`
-    <div class="road-summary-card">
+  $('#roadSummaryCards').innerHTML=summary.map(([label,value,type])=>`
+    <div class="road-summary-card ${type}">
       <span>${label}</span>
       <strong>${value}</strong>
+      <i></i>
     </div>`).join('');
 
   $('#roadGridViewBtn').classList.toggle('active',roadExplorerState.view==='grid');
@@ -478,31 +479,52 @@ function buildSyntheticPositions(cellsForRoad){
 
 function renderRoadGrid(positions){
   if(!positions.length){
-    $('#roadPositionGrid').innerHTML='<div class="road-empty">Nenhuma posição encontrada.</div>';
+    $('#roadPositionGrid').innerHTML='<div class="road-empty">Nenhuma posição encontrada para esta rua.</div>';
     return;
   }
 
   const grouped=new Map();
   positions.forEach(p=>{
-    const key=`N${pad(p.level)} · M${pad(p.module)}`;
+    const key=`N${pad(p.level)}|M${pad(p.module)}`;
     if(!grouped.has(key))grouped.set(key,[]);
     grouped.get(key).push(p);
   });
 
-  $('#roadPositionGrid').innerHTML=[...grouped.entries()].map(([group,items])=>`
-    <section class="position-group">
-      <div class="position-group-header">
-        <strong>${group}</strong>
-        <span>${items.length} posições</span>
-      </div>
-      <div class="position-cards">
-        ${items.map(p=>`
-          <button class="position-card ${p.status==='bloqueado'?'blocked':WMS.cls(p.occupancy)}" title="${p.positionId}">
-            <strong>${String(p.position).padStart(3,'0')}</strong>
-            <span>${p.occupancy.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</span>
-          </button>`).join('')}
-      </div>
-    </section>`).join('');
+  $('#roadPositionGrid').innerHTML=[...grouped.entries()].map(([group,items])=>{
+    const [level,module]=group.split('|');
+    const usable=items.filter(p=>p.status!=='bloqueado');
+    const blocked=items.filter(p=>p.status==='bloqueado').length;
+    const occupied=usable.filter(p=>p.occupied).length;
+
+    return`
+      <section class="position-group operational-style">
+        <div class="position-group-header">
+          <div>
+            <strong>${level} · ${module}</strong>
+            <small>${occupied} ocupadas · ${blocked} bloqueadas</small>
+          </div>
+          <span>${items.length} posições</span>
+        </div>
+        <div class="position-cards">
+          ${items.map(p=>{
+            const fill=Math.max(0,Math.min(100,Number(p.occupancy)||0));
+            const statusClass=p.status==='bloqueado'?'blocked':WMS.cls(p.occupancy);
+            const statusText=p.status==='bloqueado'
+              ?'Bloqueada'
+              :(p.occupied?'Ocupada':'Disponível');
+
+            return`
+              <button class="position-card operational-position ${statusClass}"
+                      style="--position-fill:${fill}%"
+                      title="${p.positionId} · ${statusText}">
+                <strong>${String(p.position).padStart(3,'0')}</strong>
+                <span>${p.status==='bloqueado'?'—':pct(p.occupancy)}</span>
+                <small>${p.status==='bloqueado'?'Bloq.':WMS.fmt(p.realPieces||0)+' pç'}</small>
+              </button>`;
+          }).join('')}
+        </div>
+      </section>`;
+  }).join('');
 }
 
 function renderRoadTable(positions){
@@ -521,6 +543,7 @@ function renderRoadTable(positions){
           <th>Ocupação</th>
           <th>Qtds Peças Real</th>
           <th>Limite Peças p/Arm</th>
+          <th>Capacidade disponível</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -533,6 +556,7 @@ function renderRoadTable(positions){
             <td>${pct(p.occupancy)}</td>
             <td>${WMS.fmt(p.realPieces)}</td>
             <td>${WMS.fmt(p.pieceLimit)}</td>
+            <td>${WMS.fmt(Math.max(0,(p.pieceLimit||0)-(p.realPieces||0)))}</td>
             <td><span class="table-status ${p.status==='bloqueado'?'blocked':WMS.cls(p.occupancy)}">${p.status==='bloqueado'?'Bloqueada':(p.occupied?'Ocupada':'Disponível')}</span></td>
           </tr>`).join('')}
       </tbody>
