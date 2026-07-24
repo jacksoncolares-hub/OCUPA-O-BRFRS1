@@ -5,8 +5,11 @@ window.ExcelImport=(()=>{
     zone:['zona','zone','area','área'],
     status:['status end','status','location status','situacao','situação','estado','status da posicao','status da posição'],
     pieces:['qtd pecas','qtd peças','quantidade pecas','quantidade peças','qty','quantity','pieces','unit qty','sku qty','quantidade','unidades'],
-    road:['pathway id','rua2','rua','corredor','aisle','pathway']
+    road:['pathway id','rua2','rua','corredor','aisle','pathway'],
+    volumeLimit:['volume limit(cm3)','volume limit','limite volume','capacidade volume','volume total'],
+    volumeOccupied:['volume occupied','volume ocupado','volume utilizado','occupied volume']
   };
+  const ALLOWED_ZONES=['A','B','HV','HS'];
 
   function clean(v){
     return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -24,7 +27,9 @@ window.ExcelImport=(()=>{
       zone:findHeader(h,aliases.zone),
       status:findHeader(h,aliases.status),
       pieces:findHeader(h,aliases.pieces),
-      road:findHeader(h,aliases.road)
+      road:findHeader(h,aliases.road),
+      volumeLimit:findHeader(h,aliases.volumeLimit),
+      volumeOccupied:findHeader(h,aliases.volumeOccupied)
     };
   }
   function parseLocation(locationId,zoneCell,roadCell){
@@ -94,19 +99,38 @@ window.ExcelImport=(()=>{
     if(s.includes('disp')||s.includes('avail')||s.includes('empty')||s.includes('livre')||s.includes('vazio'))return'disponivel';
     return Number(pieces||0)>0?'ocupado':'disponivel';
   }
-  function increment(target,key,zone,road,level,st,pieces){
-    if(!target[key])target[key]={Zona:zone,rua_num:+road||0,nivel:+level||0,total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0};
-    target[key].total++;target[key][st]++;target[key].qtd_pecas+=Number(pieces||0);
+  function increment(target,key,zone,road,level,st,pieces,volumeLimit,volumeOccupied){
+    if(!target[key])target[key]={
+      Zona:zone,rua_num:+road||0,nivel:+level||0,
+      total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,
+      volume_limit:0,volume_occupied:0
+    };
+    target[key].total++;
+    target[key][st]++;
+    target[key].qtd_pecas+=Number(pieces||0);
+    target[key].volume_limit+=Math.max(0,Number(volumeLimit||0));
+    target[key].volume_occupied+=Math.max(0,Number(volumeOccupied||0));
   }
   function final(o){
-    const usable=(+o.ocupado||0)+(+o.disponivel||0);
-    return{Zona:o.Zona,rua_num:+o.rua_num||0,nivel:+o.nivel||0,total:+o.total||0,ocupado:+o.ocupado||0,
-      disponivel:+o.disponivel||0,bloqueado:+o.bloqueado||0,
-      occ_pct:usable>0?Math.round((1000*(+o.ocupado||0))/usable)/10:null,
-      qtd_pecas:Math.round((+o.qtd_pecas||0)*100)/100};
+    const limit=Number(o.volume_limit||0);
+    const occupied=Number(o.volume_occupied||0);
+    return{
+      Zona:o.Zona,
+      rua_num:+o.rua_num||0,
+      nivel:+o.nivel||0,
+      total:+o.total||0,
+      ocupado:+o.ocupado||0,
+      disponivel:+o.disponivel||0,
+      bloqueado:+o.bloqueado||0,
+      occ_pct:limit>0?Math.round((occupied/limit)*1000)/10:null,
+      qtd_pecas:Math.round((+o.qtd_pecas||0)*100)/100,
+      volume_limit:Math.round(limit*100)/100,
+      volume_occupied:Math.round(occupied*100)/100,
+      volume_available:Math.round(Math.max(0,limit-occupied)*100)/100
+    };
   }
   function zoneSort(a,b){
-    const order={A:1,B:2,HV:3,S:4},za=typeof a==='string'?a:a.Zona,zb=typeof b==='string'?b:b.Zona;
+    const order={A:1,B:2,HV:3,HS:4},za=typeof a==='string'?a:a.Zona,zb=typeof b==='string'?b:b.Zona;
     return(order[za]||99)-(order[zb]||99)||String(za).localeCompare(String(zb));
   }
   function aggregate(rows,sheetName,fileName,onProgress){
@@ -114,6 +138,9 @@ window.ExcelImport=(()=>{
     const headers=rows[0].map(v=>String(v??''));
     const map=mapColumns(headers);
     if(map.location<0)throw new Error('Não encontrei a coluna de localização. Cabeçalhos: '+headers.join(' | '));
+    if(map.volumeLimit<0||map.volumeOccupied<0){
+      throw new Error('Não encontrei as colunas "Volume limit(cm3)" e "Volume occupied".');
+    }
 
     const zoneAgg={},roadAgg={},cellAgg={},metaCalc={};
     let valid=0,ignored=0;
@@ -129,12 +156,15 @@ window.ExcelImport=(()=>{
         map.road>=0?row[map.road]:''
       );
       if(!parsed){ignored++;continue}
-      const pieces=map.pieces>=0?num(row[map.pieces]):0;
-      const st=state(map.status>=0?row[map.status]:'',pieces);
       const {zone,road,level}=parsed;
-      increment(zoneAgg,zone,zone,road,level,st,pieces);
-      increment(roadAgg,`${zone}|${road}`,zone,road,level,st,pieces);
-      increment(cellAgg,`${zone}|${road}|${level}`,zone,road,level,st,pieces);
+      if(!ALLOWED_ZONES.includes(zone)){ignored++;continue}
+      const pieces=map.pieces>=0?num(row[map.pieces]):0;
+      const volumeLimit=num(row[map.volumeLimit]);
+      const volumeOccupied=num(row[map.volumeOccupied]);
+      const st=state(map.status>=0?row[map.status]:'',pieces);
+      increment(zoneAgg,zone,zone,road,level,st,pieces,volumeLimit,volumeOccupied);
+      increment(roadAgg,`${zone}|${road}`,zone,road,level,st,pieces,volumeLimit,volumeOccupied);
+      increment(cellAgg,`${zone}|${road}|${level}`,zone,road,level,st,pieces,volumeLimit,volumeOccupied);
       if(!metaCalc[zone])metaCalc[zone]={roads:{},levels:{},roadMin:road,roadMax:road};
       metaCalc[zone].roads[road]=true;metaCalc[zone].levels[level]=true;
       metaCalc[zone].roadMin=Math.min(metaCalc[zone].roadMin,road);
@@ -146,10 +176,15 @@ window.ExcelImport=(()=>{
     const zones=Object.keys(zoneAgg).sort(zoneSort).map(k=>final(zoneAgg[k]));
     const corridors=Object.keys(roadAgg).map(k=>final(roadAgg[k])).sort((a,b)=>zoneSort(a,b)||a.rua_num-b.rua_num);
     const cells=Object.keys(cellAgg).map(k=>final(cellAgg[k])).sort((a,b)=>zoneSort(a,b)||a.rua_num-b.rua_num||a.nivel-b.nivel);
-    const overall={Zona:'GERAL',rua_num:0,nivel:0,total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0};
-    zones.forEach(z=>['total','ocupado','disponivel','bloqueado','qtd_pecas'].forEach(k=>overall[k]+=Number(z[k]||0)));
+    const overall={Zona:'GERAL',rua_num:0,nivel:0,total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,volume_limit:0,volume_occupied:0};
+    zones.forEach(z=>['total','ocupado','disponivel','bloqueado','qtd_pecas','volume_limit','volume_occupied'].forEach(k=>overall[k]+=Number(z[k]||0)));
     const meta={};
-    const presets={A:{label:'Zona A · Bins de Separação',tipo:'bin'},B:{label:'Zona B · Porta-paletes',tipo:'pallet'},HV:{label:'Zona HV · Bins de Volume',tipo:'bin'},S:{label:'Zona S · Bins Especiais',tipo:'bin'}};
+    const presets={
+      A:{label:'Zona A',tipo:'bin'},
+      B:{label:'Zona B',tipo:'pallet'},
+      HV:{label:'Zona HV',tipo:'bin'},
+      HS:{label:'Zona HS',tipo:'bin'}
+    };
     Object.keys(metaCalc).forEach(z=>{
       const m=metaCalc[z],p=presets[z]||{};
       meta[z]={label:p.label||`Zona ${z}`,tipo:p.tipo||'bin',ruas:Object.keys(m.roads).length,
@@ -158,7 +193,11 @@ window.ExcelImport=(()=>{
     onProgress?.(100);
     return{ok:true,generated_at:new Date().toLocaleString('pt-BR'),source:{type:'manual_excel',file_name:fileName,sheet_name:sheetName,valid_rows:valid,ignored_rows:ignored},
       overall:final(overall),zones,corridors,cells,stock_trend:[],meta,
-      assumptions:['Ocupação = ocupado ÷ (ocupado + disponível).','Posições bloqueadas ficam fora do percentual.','Dados importados localmente do Excel.']};
+      assumptions:[
+        'Ocupação = soma de Volume occupied ÷ soma de Volume limit(cm3).',
+        'Somente as zonas A, B, HV e HS são consideradas.',
+        'Dados importados localmente do Excel.'
+      ]};
   }
 
   async function read(file,{sheetName,onProgress}={}){

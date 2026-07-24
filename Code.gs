@@ -1,3 +1,4 @@
+const ALLOWED_ZONES_ = ['A', 'B', 'HV', 'HS'];
 /**
  * API DO DASHBOARD BRFRS1
  * Planilha: 19MgaGStYysMHGDcb9o1pK21qdD6i3nb7af5WLOaYWgc
@@ -195,7 +196,7 @@ function buildDashboardData_() {
     assumptions: [
       'Ocupação = ocupado ÷ (ocupado + disponível).',
       'Posições bloqueadas ficam fora do percentual de ocupação.',
-      'A localização é interpretada no padrão BRFRS1-ZONA-RUA-MÓDULO-NÍVEL-POSIÇÃO.'
+      'Ocupação calculada por SUM(Volume occupied) / SUM(Volume limit(cm3)); zonas A, B, HV e HS.'
     ]
   };
 }

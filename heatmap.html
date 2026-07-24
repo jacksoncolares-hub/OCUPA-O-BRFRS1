@@ -1,22 +1,167 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BRFRS1 · Heat Map</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/styles.css?v=20260724-4"><script src="config.js?v=20260724-4"></script><style>#excelDialog{display:none}#excelDialog[open]{display:block}.hidden{display:none!important}</style></head>
-<body><div class="app">
-<aside><div class="brand"><b>S</b><div><strong>BRFRS1</strong><small>Occupancy Center</small></div></div><nav><a class="active" href="heatmap.html">▦ <span>Heat Map</span></a><a href="3d.html">◇ <span>Mapa 3D</span></a></nav><p class="aside-note">A planilha pode permanecer privada.</p></aside>
-<main>
-<header><div><em>LOGÍSTICA & SUPPLY CHAIN</em><h1>Heat Map Gerencial</h1><p>Ocupação por zona, rua e nível.</p></div><div class="header-actions"><div id="sourceBadge" class="source-badge">Fonte: verificando...</div><div id="status" class="status loading"><i></i>Carregando</div><button id="refreshBtn">↻</button></div></header>
-<section id="kpis" class="kpis"></section>
-<section class="toolbar card"><label>Zona<select id="zoneSelect"></select></label><label class="grow">Pesquisar<input id="searchInput" placeholder="Rua 23 ou A-23-05-018"></label><button id="importExcelBtn" class="excel-btn">📤 Importar Excel</button><button id="exportBtn" class="primary">Exportar PDF</button></section>
-<section class="layout">
-<div class="card heat-card"><div class="card-title"><div><h2>Ocupação por rua e nível</h2><p>Clique em uma célula para detalhes.</p></div><div class="scale"><span>0%</span><i></i><span>100%</span></div></div><div id="heatmap" class="heatmap"></div></div>
-<div class="right">
-<div class="card"><div class="card-title"><div><h2>Ranking de ruas</h2><p>Maior ocupação primeiro</p></div></div><div id="ranking" class="ranking"></div></div>
-<div class="card"><div class="card-title"><div><h2>Leitura executiva</h2><p>Insights automáticos</p></div></div><div id="insights" class="insights"></div></div>
-<div class="card"><div class="card-title"><h2>Legenda</h2></div><div class="legend"><span><i class="idle"></i>0–39%</span><span><i class="healthy"></i>40–74%</span><span><i class="alert"></i>75–89%</span><span><i class="critical"></i>90–100%</span><span><i class="blocked"></i>Sem cálculo</span></div></div>
-</div></section>
-<section class="card detail"><div class="card-title"><div><h2>Detalhes da seleção</h2><p id="detailSubtitle">Clique em uma célula.</p></div></div><div id="detailGrid" class="detail-grid empty">Nenhuma célula selecionada.</div></section>
-</main></div><div id="toast" class="toast"></div><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="js/api.js?v=20260724-4"></script><script src="js/excel-import.js?v=20260724-4"></script><script src="js/heatmap.js?v=20260724-4"></script>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BRFRS1 Occupancy Center</title>
+  <link rel="stylesheet" href="css/styles.css?v=20260724-6">
+  <style>#excelDialog{display:none}#excelDialog[open]{display:block}.hidden{display:none!important}</style>
+</head>
+<body class="modern-dashboard">
+  <div id="toast" class="toast"></div>
 
-<dialog id="excelDialog" class="excel-dialog">
+  <aside class="modern-sidebar">
+    <div class="brand-block">
+      <div class="brand-mark">B1</div>
+      <div>
+        <span>BRFRS1</span>
+        <strong>Occupancy Center</strong>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-section="overview">
+        <span>◫</span>
+        Visão geral
+      </button>
+      <button class="nav-item" id="openRoadExplorerNav">
+        <span>⌕</span>
+        Análise por rua
+      </button>
+      <a class="nav-item" href="3d.html">
+        <span>⬡</span>
+        Mapa 3D
+      </a>
+    </nav>
+
+    <div class="sidebar-status">
+      <small>Fonte atual</small>
+      <div id="sourceBadge" class="source-badge">Verificando...</div>
+      <button id="importExcelBtn" class="sidebar-action">📤 Importar Excel</button>
+      <button id="refreshBtn" class="sidebar-action ghost">↻ Atualizar dados</button>
+    </div>
+  </aside>
+
+  <main class="modern-main">
+    <header class="modern-topbar">
+      <div>
+        <span class="eyebrow">LOGÍSTICA & SUPPLY CHAIN</span>
+        <h1>Ocupação gerencial</h1>
+        <p>Leitura volumétrica por zona, rua, nível e posição.</p>
+      </div>
+
+      <div class="topbar-actions">
+        <div id="status" class="status loading"><i></i>Carregando</div>
+        <button id="exportBtn" class="topbar-btn">Exportar PDF</button>
+      </div>
+    </header>
+
+    <section class="filter-command">
+      <div class="filter-group">
+        <label for="zoneSelect">Zona</label>
+        <select id="zoneSelect"></select>
+      </div>
+      <div class="filter-group grow">
+        <label for="searchInput">Pesquisa rápida</label>
+        <input id="searchInput" placeholder="Rua 23, A-23-05-018 ou HV-02-01">
+      </div>
+      <button id="openRoadExplorerBtn" class="road-explorer-cta">
+        <span>⌕</span>
+        Analisar rua
+      </button>
+    </section>
+
+    <section id="kpis" class="modern-kpis"></section>
+
+    <section class="dashboard-grid">
+      <article id="heatCard" class="modern-card heat-card-modern">
+        <div class="modern-card-header">
+          <div>
+            <span class="card-kicker">HEAT MAP</span>
+            <h2>Ocupação volumétrica por rua e nível</h2>
+            <p>Volume occupied ÷ Volume limit(cm3)</p>
+          </div>
+          <div class="heat-title-actions">
+            <div class="scale"><span>0%</span><i></i><span>100%</span></div>
+            <button id="fullscreenBtn" class="icon-btn" type="button">⛶ Expandir</button>
+          </div>
+        </div>
+        <div id="heatmap" class="heatmap modern-heatmap"></div>
+      </article>
+
+      <aside class="insights-column">
+        <article class="modern-card compact-card">
+          <div class="modern-card-header small">
+            <div>
+              <span class="card-kicker">PRIORIDADES</span>
+              <h3>Ranking de ruas</h3>
+            </div>
+          </div>
+          <div id="ranking" class="ranking-list"></div>
+        </article>
+
+        <article class="modern-card compact-card">
+          <div class="modern-card-header small">
+            <div>
+              <span class="card-kicker">INSIGHTS</span>
+              <h3>Leitura executiva</h3>
+            </div>
+          </div>
+          <div id="insights" class="insight-list"></div>
+        </article>
+      </aside>
+    </section>
+
+    <section class="modern-card detail-card-modern">
+      <div class="modern-card-header small">
+        <div>
+          <span class="card-kicker">DETALHAMENTO</span>
+          <h3 id="detailSubtitle">Selecione uma célula ou abra a análise por rua</h3>
+        </div>
+      </div>
+      <div id="detailGrid" class="detail-grid empty">Nenhuma célula selecionada.</div>
+    </section>
+  </main>
+
+  <dialog id="roadExplorerDialog" class="road-dialog">
+    <form method="dialog" class="road-dialog-shell">
+      <div class="road-dialog-header">
+        <div>
+          <span class="road-dialog-kicker">ANÁLISE OPERACIONAL</span>
+          <h2>Ocupação detalhada por rua</h2>
+          <p>Visualize todas as posições, níveis, módulos e ocupação volumétrica de uma rua.</p>
+        </div>
+        <button id="closeRoadExplorerBtn" class="dialog-close" type="button">×</button>
+      </div>
+
+      <div class="road-dialog-filters">
+        <div class="filter-group">
+          <label for="roadZoneSelect">Zona</label>
+          <select id="roadZoneSelect"></select>
+        </div>
+        <div class="filter-group">
+          <label for="roadSelect">Rua</label>
+          <select id="roadSelect"></select>
+        </div>
+        <div class="filter-group grow">
+          <label for="roadSearchInput">Pesquisar posição</label>
+          <input id="roadSearchInput" placeholder="Ex.: 018, módulo 05 ou nível 03">
+        </div>
+      </div>
+
+      <div id="roadSummaryCards" class="road-summary-cards"></div>
+
+      <div class="road-view-switch">
+        <button id="roadGridViewBtn" class="active" type="button">Grade de posições</button>
+        <button id="roadTableViewBtn" type="button">Tabela detalhada</button>
+      </div>
+
+      <div id="roadPositionGrid" class="road-position-grid"></div>
+      <div id="roadPositionTable" class="road-position-table hidden"></div>
+    </form>
+  </dialog>
+
+  <dialog id="excelDialog" class="excel-dialog">
   <form method="dialog" class="excel-dialog-shell">
     <div class="excel-dialog-header">
       <div>
@@ -68,4 +213,12 @@
     </div>
   </form>
 </dialog>
-<script src="js/import-ui.js?v=20260724-4"></script></body></html>
+
+  <script src="config.js?v=20260724-6"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="js/api.js?v=20260724-6"></script>
+<script src="js/excel-import.js?v=20260724-6"></script>
+<script src="js/heatmap.js?v=20260724-6"></script>
+<script src="js/import-ui.js?v=20260724-6"></script>
+</body>
+</html>

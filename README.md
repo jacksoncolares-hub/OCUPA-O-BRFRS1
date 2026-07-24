@@ -57,3 +57,32 @@ Agora o sistema interpreta:
 - Posição: `018`
 
 Também prioriza a coluna `Pathway ID` para identificar a rua.
+
+
+## Ocupação volumétrica e filtros (20260724-5)
+
+O cálculo principal agora é:
+
+`SUM(Volume occupied) ÷ SUM(Volume limit(cm3)) × 100`
+
+Regras:
+- Somente zonas A, B, HV e HS.
+- A zona HS já está preparada e aparece como "sem dados" enquanto não existir na base.
+- O seletor permite "Visão geral · Todas as zonas" ou uma zona específica.
+- Na visão geral, as ruas são identificadas por zona para evitar misturar ruas com o mesmo número.
+- O Heat Map possui botão de tela cheia.
+
+
+## Layout moderno e análise por rua (20260724-6)
+
+Novidades:
+- Sidebar moderna.
+- Cards e filtros redesenhados.
+- Janela exclusiva **Análise por rua**.
+- Filtros por zona, rua e pesquisa de posição.
+- Visualização em grade e tabela.
+- Resumo da rua com ocupação, volumes e quantidade de posições.
+- Mantém tela cheia, importação de Excel, visão geral e filtros por zona.
+
+Observação:
+O JSON atual é consolidado por rua e nível. A janela distribui visualmente as posições com base no total de cada nível. Para mostrar o valor exato de cada endereço individual, será necessária uma versão da API que também envie as linhas brutas das posições.
