@@ -26,3 +26,17 @@ git push origin main
 ```
 
 Depois abra o GitHub Pages e pressione `Ctrl + F5`.
+
+
+## Correção desta versão (20260724-2)
+- Adicionado versionamento nos arquivos CSS e JavaScript para evitar cache antigo do GitHub Pages.
+- Corrigido o erro `WMS.useImportedData is not a function`.
+- Adicionado CSS crítico para o modal não aparecer sem formatação durante o carregamento.
+- Depois de publicar, use `Ctrl + F5` uma vez.
+
+
+## Janela central de importação (20260724-3)
+- O botão **Importar Excel** agora abre uma janela central nativa do navegador.
+- O restante do dashboard fica escurecido.
+- `Esc`, botão fechar e clique fora fecham a janela quando nenhuma importação está em andamento.
+- A janela exibe fonte atual, última atualização, arquivo escolhido, progresso e resultado.

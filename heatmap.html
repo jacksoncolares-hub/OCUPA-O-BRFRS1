@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BRFRS1 · Heat Map</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/styles.css"><script src="config.js"></script></head>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BRFRS1 · Heat Map</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/styles.css?v=20260724-3"><script src="config.js?v=20260724-3"></script><style>#excelDialog{display:none}#excelDialog[open]{display:block}.hidden{display:none!important}</style></head>
 <body><div class="app">
 <aside><div class="brand"><b>S</b><div><strong>BRFRS1</strong><small>Occupancy Center</small></div></div><nav><a class="active" href="heatmap.html">▦ <span>Heat Map</span></a><a href="3d.html">◇ <span>Mapa 3D</span></a></nav><p class="aside-note">A planilha pode permanecer privada.</p></aside>
 <main>
@@ -14,31 +14,58 @@
 <div class="card"><div class="card-title"><h2>Legenda</h2></div><div class="legend"><span><i class="idle"></i>0–39%</span><span><i class="healthy"></i>40–74%</span><span><i class="alert"></i>75–89%</span><span><i class="critical"></i>90–100%</span><span><i class="blocked"></i>Sem cálculo</span></div></div>
 </div></section>
 <section class="card detail"><div class="card-title"><div><h2>Detalhes da seleção</h2><p id="detailSubtitle">Clique em uma célula.</p></div></div><div id="detailGrid" class="detail-grid empty">Nenhuma célula selecionada.</div></section>
-</main></div><div id="toast" class="toast"></div><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="js/api.js"></script><script src="js/excel-import.js"></script><script src="js/heatmap.js"></script>
-<div id="excelModal" class="modal" aria-hidden="true">
-  <div class="modal-backdrop" data-close-modal></div>
-  <div class="modal-panel">
-    <button class="modal-close" data-close-modal>×</button>
-    <div class="upload-icon">📤</div>
-    <h2>Atualizar dados manualmente</h2>
-    <p>Selecione ou arraste o arquivo exportado do WMS. O processamento acontece no navegador e o arquivo não é enviado para o GitHub.</p>
-    <div id="dropZone" class="drop-zone">
+</main></div><div id="toast" class="toast"></div><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="js/api.js?v=20260724-3"></script><script src="js/excel-import.js?v=20260724-3"></script><script src="js/heatmap.js?v=20260724-3"></script>
+
+<dialog id="excelDialog" class="excel-dialog">
+  <form method="dialog" class="excel-dialog-shell">
+    <div class="excel-dialog-header">
+      <div>
+        <span class="excel-dialog-kicker">BRFRS1 OCCUPANCY CENTER</span>
+        <h2>Atualizar base pelo Excel</h2>
+        <p>Carregue o arquivo exportado do WMS. O processamento acontece somente no navegador.</p>
+      </div>
+      <button id="closeExcelDialogBtn" class="dialog-close" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="excel-source-line">
+      <div>
+        <span>Fonte atual</span>
+        <strong id="dialogSourceText">Verificando...</strong>
+      </div>
+      <div>
+        <span>Última atualização</span>
+        <strong id="dialogUpdatedAt">—</strong>
+      </div>
+    </div>
+
+    <div id="dropZone" class="dialog-drop-zone">
       <input id="excelFileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden>
-      <strong>Arraste a planilha aqui</strong>
-      <span>ou</span>
-      <button id="chooseExcelBtn" type="button">Selecionar arquivo</button>
-      <small>.xlsx, .xls, .xlsm ou .csv</small>
+      <div class="excel-file-icon">X</div>
+      <strong>Arraste sua planilha para esta janela</strong>
+      <span>ou selecione o arquivo manualmente</span>
+      <button id="chooseExcelBtn" class="choose-file-btn" type="button">Selecionar arquivo</button>
+      <small>Formatos aceitos: .xlsx, .xls, .xlsm e .csv</small>
     </div>
-    <div id="fileSelected" class="file-selected hidden"></div>
-    <div id="importProgress" class="import-progress hidden">
-      <div class="progress-head"><span id="progressText">Preparando...</span><b id="progressPct">0%</b></div>
-      <div class="progress-track"><i id="progressBar"></i></div>
+
+    <div id="fileSelected" class="dialog-file-selected hidden"></div>
+
+    <div id="importProgress" class="dialog-progress hidden">
+      <div class="dialog-progress-head">
+        <span id="progressText">Preparando...</span>
+        <strong id="progressPct">0%</strong>
+      </div>
+      <div class="dialog-progress-track"><i id="progressBar"></i></div>
     </div>
-    <div id="importResult" class="import-result hidden"></div>
-    <div class="modal-actions">
-      <button id="clearManualBtn" class="danger-soft" type="button">Voltar ao Google Sheets</button>
-      <button id="processExcelBtn" class="primary" type="button" disabled>Atualizar Dashboard</button>
+
+    <div id="importResult" class="dialog-result hidden"></div>
+
+    <div class="excel-dialog-footer">
+      <button id="clearManualBtn" class="secondary-btn" type="button">Voltar ao Google Sheets</button>
+      <div class="footer-right">
+        <button id="cancelExcelBtn" class="secondary-btn" type="button">Cancelar</button>
+        <button id="processExcelBtn" class="primary-btn" type="button" disabled>Atualizar Dashboard</button>
+      </div>
     </div>
-  </div>
-</div>
-<script src="js/import-ui.js"></script></body></html>
+  </form>
+</dialog>
+<script src="js/import-ui.js?v=20260724-3"></script></body></html>

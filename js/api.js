@@ -1,5 +1,6 @@
 
 window.WMS=(()=>{
+  const BUILD_VERSION='20260724-2';
   let cache=null;
   let sourceInfo={type:'none',label:'Nenhuma fonte',updatedAt:null,fileName:null};
   const c=window.APP_CONFIG||{};
@@ -106,5 +107,5 @@ window.WMS=(()=>{
   function getSourceInfo(){return {...sourceInfo}}
   function resetMemory(){cache=null}
 
-  return{load,zones,cls,fmt,config:c,useImportedData,clearImportedData,getSourceInfo,resetMemory};
+  return{load,zones,cls,fmt,config:c,useImportedData,clearImportedData,getSourceInfo,resetMemory,BUILD_VERSION};
 })();
