@@ -53,10 +53,10 @@ function roads(){return zoneRows(state.data.corridors)}
 
 function aggregateGeneral(){
   const selected=state.data.zones.filter(z=>ALLOWED_ZONES.includes(String(z.Zona)));
-  const o={Zona:'GERAL',total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,volume_limit:0,volume_occupied:0};
-  selected.forEach(z=>['total','ocupado','disponivel','bloqueado','qtd_pecas','volume_limit','volume_occupied'].forEach(k=>o[k]+=Number(z[k]||0)));
-  o.volume_available=Math.max(0,o.volume_limit-o.volume_occupied);
-  o.occ_pct=o.volume_limit>0?Math.round(o.volume_occupied/o.volume_limit*1000)/10:null;
+  const o={Zona:'GERAL',total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,piece_limit:0,real_pieces:0};
+  selected.forEach(z=>['total','ocupado','disponivel','bloqueado','qtd_pecas','piece_limit','real_pieces'].forEach(k=>o[k]+=Number(z[k]||0)));
+  o.available_pieces=Math.max(0,o.piece_limit-o.real_pieces);
+  o.occ_pct=o.piece_limit>0?Math.round(o.real_pieces/o.piece_limit*1000)/10:null;
   return o;
 }
 
@@ -77,10 +77,10 @@ function renderAll(){
 function renderKpis(){
   const z=currentSummary();
   const a=[
-    ['Ocupação volumétrica',pct(z.occ_pct),'volume ocupado ÷ limite'],
-    ['Volume limite',fmtVolume(z.volume_limit),'capacidade total em cm³'],
-    ['Volume ocupado',fmtVolume(z.volume_occupied),'volume utilizado'],
-    ['Volume disponível',fmtVolume(z.volume_available),'capacidade restante'],
+    ['Ocupação por peças',pct(z.occ_pct),'Qtds Peças Real ÷ Limite Peças p/Arm'],
+    ['Limite de peças',WMS.fmt(z.piece_limit),'capacidade total dos endereços'],
+    ['Quantidade real',WMS.fmt(z.real_pieces),'peças armazenadas atualmente'],
+    ['Capacidade disponível',WMS.fmt(z.available_pieces),'limite restante em peças'],
     ['Posições',WMS.fmt(z.total),'endereços considerados']
   ];
   $('#kpis').innerHTML=a.map(x=>`<div class="kpi card"><small>${x[0]}</small><strong>${x[1]}</strong><span>${x[2]}</span></div>`).join('');
@@ -123,7 +123,7 @@ function renderHeat(){
       return c
         ?`<td class="heat-cell ${WMS.cls(c.occ_pct)}" data-z="${zone}" data-r="${road}" data-l="${level}">
             <strong>${pct(c.occ_pct)}</strong>
-            <span>${fmtCompact(c.volume_occupied)} / ${fmtCompact(c.volume_limit)} cm³</span>
+            <span>${WMS.fmt(c.real_pieces)} / ${WMS.fmt(c.piece_limit)} peças</span>
           </td>`
         :`<td class="heat-cell blocked"><strong>—</strong><span>sem dado</span></td>`;
     }).join('');
@@ -131,7 +131,7 @@ function renderHeat(){
     const total=roadData
       ?`<td class="heat-cell ${WMS.cls(roadData.occ_pct)}" data-z="${zone}" data-r="${road}" data-l="0">
           <strong>${pct(roadData.occ_pct)}</strong>
-          <span>${fmtCompact(roadData.volume_occupied)} / ${fmtCompact(roadData.volume_limit)} cm³</span>
+          <span>${WMS.fmt(roadData.real_pieces)} / ${WMS.fmt(roadData.piece_limit)} peças</span>
         </td>`
       :'<td></td>';
 
@@ -166,7 +166,7 @@ function renderInsights(){
   const a=[
     crit.length?`${crit.length} rua(s) acima de 90% de ocupação volumétrica.`:'Nenhuma rua crítica acima de 90%.',
     free?`Maior folga: ${state.zone==='GERAL'?`Zona ${free.Zona} · `:''}Rua ${pad(free.rua_num)} com ${pct(free.occ_pct)}.`:'Sem dados para folga.',
-    `${fmtVolume(summary.volume_available)} de volume disponível.`
+    `${WMS.fmt(summary.available_pieces)} peças de capacidade disponível.`
   ];
   $('#insights').innerHTML=a.map(t=>`<div class="insight">${t}</div>`).join('');
 }
@@ -191,10 +191,10 @@ function renderDetail(){
     ['Zona',c.Zona],
     ['Rua',pad(c.rua_num)],
     ['Nível',+c.nivel?pad(c.nivel):'Consolidado'],
-    ['Ocupação volumétrica',pct(c.occ_pct)],
-    ['Volume limite',fmtVolume(c.volume_limit)],
-    ['Volume ocupado',fmtVolume(c.volume_occupied)],
-    ['Volume disponível',fmtVolume(c.volume_available)],
+    ['Ocupação por peças',pct(c.occ_pct)],
+    ['Limite de peças',WMS.fmt(c.piece_limit)],
+    ['Quantidade real',WMS.fmt(c.real_pieces)],
+    ['Capacidade disponível',WMS.fmt(c.available_pieces)],
     ['Posições',WMS.fmt(c.total)],
     ['Bloqueadas',WMS.fmt(c.bloqueado)]
   ];
@@ -363,9 +363,9 @@ function renderRoadExplorer(){
 
   const summary=[
     ['Ocupação da rua',pct(corridor?.occ_pct)],
-    ['Volume ocupado',fmtVolume(corridor?.volume_occupied)],
-    ['Volume limite',fmtVolume(corridor?.volume_limit)],
-    ['Volume disponível',fmtVolume(corridor?.volume_available)],
+    ['Quantidade real',WMS.fmt(corridor?.real_pieces)],
+    ['Limite de peças',WMS.fmt(corridor?.piece_limit)],
+    ['Capacidade disponível',WMS.fmt(corridor?.available_pieces)],
     ['Posições',WMS.fmt(corridor?.total)]
   ];
   $('#roadSummaryCards').innerHTML=summary.map(([label,value])=>`
@@ -399,8 +399,8 @@ function buildSyntheticPositions(cellsForRoad){
       occupied:String(p.status)==='ocupado',
       status:p.status,
       occupancy:Number(p.occ_pct)||0,
-      volumeLimit:Number(p.volume_limit)||0,
-      volumeOccupied:Number(p.volume_occupied)||0
+      pieceLimit:Number(p.piece_limit)||0,
+      realPieces:Number(p.real_pieces)||0
     }));
 
   if(exact.length)return exact;
@@ -426,8 +426,8 @@ function buildSyntheticPositions(cellsForRoad){
         occupied,
         status:occupied?'ocupado':'disponivel',
         occupancy:Number(cell.occ_pct)||0,
-        volumeLimit:Number(cell.volume_limit||0)/total,
-        volumeOccupied:Number(cell.volume_occupied||0)/total
+        pieceLimit:Number(cell.piece_limit||0)/total,
+        realPieces:Number(cell.real_pieces||0)/total
       });
     }
   });
@@ -477,8 +477,8 @@ function renderRoadTable(positions){
           <th>Nível</th>
           <th>Módulo</th>
           <th>Ocupação</th>
-          <th>Volume ocupado</th>
-          <th>Volume limite</th>
+          <th>Qtds Peças Real</th>
+          <th>Limite Peças p/Arm</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -489,8 +489,8 @@ function renderRoadTable(positions){
             <td>N${pad(p.level)}</td>
             <td>M${pad(p.module)}</td>
             <td>${pct(p.occupancy)}</td>
-            <td>${fmtVolume(p.volumeOccupied)}</td>
-            <td>${fmtVolume(p.volumeLimit)}</td>
+            <td>${WMS.fmt(p.realPieces)}</td>
+            <td>${WMS.fmt(p.pieceLimit)}</td>
             <td><span class="table-status ${p.status==='bloqueado'?'blocked':WMS.cls(p.occupancy)}">${p.status==='bloqueado'?'Bloqueada':(p.occupied?'Ocupada':'Disponível')}</span></td>
           </tr>`).join('')}
       </tbody>

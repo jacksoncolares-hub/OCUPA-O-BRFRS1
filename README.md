@@ -107,3 +107,24 @@ Também:
 - a análise por rua mostra os endereços reais;
 - corrige a identificação da fonte atual;
 - corrige os textos do ranking.
+
+
+## Ocupação por quantidade de peças (20260724-8)
+
+O cálculo principal foi alterado para:
+
+`SUM(Qtds Peças Real) ÷ SUM(Limite Peças p/Arm) × 100`
+
+Exemplo:
+- Limite Peças p/Arm: 100
+- Qtds Peças Real: 75
+- Ocupação: 75%
+
+A alteração foi aplicada em:
+- KPIs;
+- Heat Map;
+- total por rua;
+- ranking;
+- análise detalhada por rua;
+- posições individuais;
+- capacidade disponível.
