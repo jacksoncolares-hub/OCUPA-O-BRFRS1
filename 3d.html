@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BRFRS1 · 3D</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/styles.css?v=20260724-9"><script src="config.js?v=20260724-9"></script><style>#excelDialog{display:none}#excelDialog[open]{display:block}.hidden{display:none!important}</style></head>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BRFRS1 · 3D</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/styles.css?v=20260724-10"><script src="config.js?v=20260724-10"></script><style>#excelDialog{display:none}#excelDialog[open]{display:block}.hidden{display:none!important}</style></head>
 <body><div class="app">
 <aside><div class="brand"><b>S</b><div><strong>BRFRS1</strong><small>Occupancy Center</small></div></div><nav><a href="heatmap.html">▦ <span>Heat Map</span></a><a class="active" href="3d.html">◇ <span>Mapa 3D</span></a></nav><p class="aside-note">Renderização leve: uma zona por vez.</p></aside>
 <main><header><div><em>DIGITAL TWIN</em><h1>Mapa 3D do Armazém</h1><p>Visualização por zona e nível.</p></div><div id="sourceBadge" class="source-badge">Fonte: verificando...</div><div id="status" class="status loading"><i></i>Carregando</div></header>
 <section class="toolbar card"><label>Zona<select id="zoneSelect"></select></label><label>Nível<select id="levelSelect"><option value="all">Todos</option></select></label><label class="grow">Pesquisar endereço<input id="searchInput" placeholder="A-23-05-018"></label><button id="importExcelBtn" class="excel-btn">📤 Importar Excel</button><button id="droneBtn">Modo drone</button><button id="operatorBtn">Modo operador</button></section>
 <section class="card viewer"><div id="viewer"></div><div id="viewerInfo" class="viewer-info">Carregando...</div><div class="viewer-help">Arraste para girar · scroll para zoom</div></section>
-</main></div><script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="js/api.js?v=20260724-9"></script><script src="js/excel-import.js?v=20260724-9"></script><script src="js/warehouse3d.js?v=20260724-9"></script>
+</main></div><script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="js/api.js?v=20260724-10"></script><script src="js/excel-import.js?v=20260724-10"></script><script src="js/warehouse3d.js?v=20260724-10"></script>
 
 <dialog id="excelDialog" class="excel-dialog">
   <form method="dialog" class="excel-dialog-shell">
@@ -59,4 +59,4 @@
     </div>
   </form>
 </dialog>
-<script src="js/import-ui.js?v=20260724-9"></script></body></html>
+<script src="js/import-ui.js?v=20260724-10"></script></body></html>

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>BRFRS1 Occupancy Center</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260724-9">
+  <link rel="stylesheet" href="css/styles.css?v=20260724-10">
   <style>#excelDialog{display:none}#excelDialog[open]{display:block}.hidden{display:none!important}</style>
 </head>
 <body class="modern-dashboard">
@@ -47,7 +47,7 @@
       <div>
         <span class="eyebrow">LOGÍSTICA & SUPPLY CHAIN</span>
         <h1>Ocupação gerencial</h1>
-        <p>Leitura de ocupação por quantidade de peças, zona, rua, nível e posição.</p>
+        <p>Leitura de ocupação considerando apenas posições não bloqueadas.</p>
       </div>
 
       <div class="topbar-actions">
@@ -79,7 +79,7 @@
           <div>
             <span class="card-kicker">HEAT MAP</span>
             <h2>Ocupação por peças por rua e nível</h2>
-            <p>Qtds Peças Real ÷ Limite Peças p/Arm</p>
+            <p>Qtds Peças Real ÷ Limite útil de peças</p>
           </div>
           <div class="heat-title-actions">
             <div class="scale"><span>0%</span><i></i><span>100%</span></div>
@@ -214,11 +214,11 @@
   </form>
 </dialog>
 
-  <script src="config.js?v=20260724-9"></script>
+  <script src="config.js?v=20260724-10"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="js/api.js?v=20260724-9"></script>
-<script src="js/excel-import.js?v=20260724-9"></script>
-<script src="js/heatmap.js?v=20260724-9"></script>
-<script src="js/import-ui.js?v=20260724-9"></script>
+<script src="js/api.js?v=20260724-10"></script>
+<script src="js/excel-import.js?v=20260724-10"></script>
+<script src="js/heatmap.js?v=20260724-10"></script>
+<script src="js/import-ui.js?v=20260724-10"></script>
 </body>
 </html>

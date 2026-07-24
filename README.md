@@ -128,3 +128,24 @@ A alteração foi aplicada em:
 - análise detalhada por rua;
 - posições individuais;
 - capacidade disponível.
+
+
+## Ocupação excluindo bloqueados (20260724-10)
+
+Nova regra:
+
+`Ocupação = SUM(Qtds Peças Real não bloqueadas) ÷ SUM(Limite Peças p/Arm não bloqueadas) × 100`
+
+As posições bloqueadas:
+- não entram no limite útil;
+- não entram na quantidade real utilizada;
+- não entram na capacidade disponível;
+- não entram no percentual de ocupação;
+- continuam aparecendo apenas como indicador de bloqueio.
+
+Exemplo:
+- Limite total físico: 1.000 peças
+- Limite em posições bloqueadas: 300 peças
+- Limite útil: 700 peças
+- Quantidade real em posições úteis: 350 peças
+- Ocupação: 50%

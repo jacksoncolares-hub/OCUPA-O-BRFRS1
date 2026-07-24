@@ -53,8 +53,8 @@ function roads(){return zoneRows(state.data.corridors)}
 
 function aggregateGeneral(){
   const selected=state.data.zones.filter(z=>ALLOWED_ZONES.includes(String(z.Zona)));
-  const o={Zona:'GERAL',total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,piece_limit:0,real_pieces:0};
-  selected.forEach(z=>['total','ocupado','disponivel','bloqueado','qtd_pecas','piece_limit','real_pieces'].forEach(k=>o[k]+=Number(z[k]||0)));
+  const o={Zona:'GERAL',total:0,usable_positions:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,piece_limit:0,real_pieces:0};
+  selected.forEach(z=>['total','usable_positions','ocupado','disponivel','bloqueado','qtd_pecas','piece_limit','real_pieces'].forEach(k=>o[k]+=Number(z[k]||0)));
   o.available_pieces=Math.max(0,o.piece_limit-o.real_pieces);
   o.occ_pct=o.piece_limit>0?Math.round(o.real_pieces/o.piece_limit*1000)/10:null;
   return o;
@@ -102,7 +102,7 @@ function renderKpis(){
         <strong>${pct(card.value)}</strong>
         <div class="percent-kpi-meta">
           <span>${WMS.fmt(card.real)} peças</span>
-          <span>de ${WMS.fmt(card.limit)}</span>
+          <span>de ${WMS.fmt(card.limit)} úteis</span>
         </div>
         <div class="percent-kpi-track"><i></i></div>
       </button>`;
@@ -154,14 +154,14 @@ function renderHeat(){
       const c=cellMap.get(`${zone}|${road}|${level}`);
       return c
         ?`<td class="heat-cell heat-fill ${WMS.cls(c.occ_pct)}" style="--heat-fill:${Math.max(0,Math.min(100,Number(c.occ_pct)||0))}%" data-z="${zone}" data-r="${road}" data-l="${level}">
-            <div class="heat-cell-content"><strong>${pct(c.occ_pct)}</strong><span>${WMS.fmt(c.real_pieces)} peças</span><small>Limite ${WMS.fmt(c.piece_limit)}</small></div>
+            <div class="heat-cell-content"><strong>${pct(c.occ_pct)}</strong><span>${WMS.fmt(c.real_pieces)} peças</span><small>Limite útil ${WMS.fmt(c.piece_limit)}</small></div>
           </td>`
         :`<td class="heat-cell blocked"><strong>—</strong><span>sem dado</span></td>`;
     }).join('');
 
     const total=roadData
       ?`<td class="heat-cell heat-fill ${WMS.cls(roadData.occ_pct)}" style="--heat-fill:${Math.max(0,Math.min(100,Number(roadData.occ_pct)||0))}%" data-z="${zone}" data-r="${road}" data-l="0">
-          <div class="heat-cell-content"><strong>${pct(roadData.occ_pct)}</strong><span>${WMS.fmt(roadData.real_pieces)} peças</span><small>Limite ${WMS.fmt(roadData.piece_limit)}</small></div>
+          <div class="heat-cell-content"><strong>${pct(roadData.occ_pct)}</strong><span>${WMS.fmt(roadData.real_pieces)} peças</span><small>Limite útil ${WMS.fmt(roadData.piece_limit)}</small></div>
         </td>`
       :'<td></td>';
 
@@ -201,7 +201,8 @@ function renderInsights(){
     {icon:'↗',title:highest?`Maior ocupação: ${pct(highest.occ_pct)}`:'Sem dados',text:highest?`${state.zone==='GERAL'?`Zona ${highest.Zona} · `:''}Rua ${pad(highest.rua_num)} com ${WMS.fmt(highest.real_pieces)} peças.`:'Não há ruas disponíveis.',type:'primary'},
     {icon:'◔',title:attention.length?`${attention.length} rua(s) em atenção`:'Sem ruas em atenção',text:attention.length?'Faixa entre 75% e 89,9% de ocupação.':'Nenhuma rua está na faixa de atenção.',type:'warning'},
     {icon:'↓',title:lowestWithStock?`Menor ocupação com estoque: ${pct(lowestWithStock.occ_pct)}`:'Sem estoque',text:lowestWithStock?`${state.zone==='GERAL'?`Zona ${lowestWithStock.Zona} · `:''}Rua ${pad(lowestWithStock.rua_num)} possui ${WMS.fmt(lowestWithStock.real_pieces)} peças.`:'Nenhuma rua com estoque encontrada.',type:'neutral'},
-    {icon:'□',title:`${WMS.fmt(summary.available_pieces)} peças disponíveis`,text:'Capacidade restante considerando o limite informado.',type:'info'}
+    {icon:'□',title:`${WMS.fmt(summary.available_pieces)} peças disponíveis`,text:'Capacidade restante somente em posições não bloqueadas.',type:'info'},
+    {icon:'×',title:`${WMS.fmt(summary.bloqueado)} posições bloqueadas`,text:'Essas posições ficam fora do cálculo de capacidade e ocupação.',type:'neutral'}
   ];
 
   $('#insights').innerHTML=items.map(item=>`
@@ -232,10 +233,11 @@ function renderDetail(){
     ['Rua',pad(c.rua_num)],
     ['Nível',+c.nivel?pad(c.nivel):'Consolidado'],
     ['Ocupação por peças',pct(c.occ_pct)],
-    ['Limite de peças',WMS.fmt(c.piece_limit)],
-    ['Quantidade real',WMS.fmt(c.real_pieces)],
+    ['Limite útil de peças',WMS.fmt(c.piece_limit)],
+    ['Quantidade real útil',WMS.fmt(c.real_pieces)],
     ['Capacidade disponível',WMS.fmt(c.available_pieces)],
-    ['Posições',WMS.fmt(c.total)],
+    ['Posições totais',WMS.fmt(c.total)],
+    ['Posições utilizáveis',WMS.fmt(c.usable_positions)],
     ['Bloqueadas',WMS.fmt(c.bloqueado)]
   ];
   $('#detailGrid').className='detail-grid';
@@ -403,10 +405,10 @@ function renderRoadExplorer(){
 
   const summary=[
     ['Ocupação da rua',pct(corridor?.occ_pct)],
-    ['Quantidade real',WMS.fmt(corridor?.real_pieces)],
-    ['Limite de peças',WMS.fmt(corridor?.piece_limit)],
+    ['Quantidade real útil',WMS.fmt(corridor?.real_pieces)],
+    ['Limite útil',WMS.fmt(corridor?.piece_limit)],
     ['Capacidade disponível',WMS.fmt(corridor?.available_pieces)],
-    ['Posições',WMS.fmt(corridor?.total)]
+    ['Posições utilizáveis',WMS.fmt(corridor?.usable_positions)]
   ];
   $('#roadSummaryCards').innerHTML=summary.map(([label,value])=>`
     <div class="road-summary-card">

@@ -120,14 +120,21 @@ window.ExcelImport=(()=>{
   function increment(target,key,zone,road,level,st,pieces,pieceLimit,realPieces){
     if(!target[key])target[key]={
       Zona:zone,rua_num:+road||0,nivel:+level||0,
-      total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,
+      total:0,usable_positions:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,
       piece_limit:0,real_pieces:0
     };
+
     target[key].total++;
     target[key][st]++;
-    target[key].qtd_pecas+=Number(pieces||0);
-    target[key].piece_limit+=Math.max(0,Number(pieceLimit||0));
-    target[key].real_pieces+=Math.max(0,Number(realPieces||0));
+
+    // Posições bloqueadas ficam fora da capacidade disponível
+    // e também fora do cálculo de ocupação.
+    if(st!=='bloqueado'){
+      target[key].usable_positions++;
+      target[key].qtd_pecas+=Number(pieces||0);
+      target[key].piece_limit+=Math.max(0,Number(pieceLimit||0));
+      target[key].real_pieces+=Math.max(0,Number(realPieces||0));
+    }
   }
 
   function final(o){
@@ -139,6 +146,7 @@ window.ExcelImport=(()=>{
       rua_num:+o.rua_num||0,
       nivel:+o.nivel||0,
       total:+o.total||0,
+      usable_positions:+o.usable_positions||0,
       ocupado:+o.ocupado||0,
       disponivel:+o.disponivel||0,
       bloqueado:+o.bloqueado||0,
@@ -201,10 +209,12 @@ window.ExcelImport=(()=>{
         location_id:loc,
         status:st,
         qtd_pecas:pieces,
-        piece_limit:pieceLimit,
-        real_pieces:realPieces,
-        available_pieces:Math.max(0,pieceLimit-realPieces),
-        occ_pct:pieceLimit>0?Math.round((realPieces/pieceLimit)*1000)/10:null
+        piece_limit:st==='bloqueado'?0:pieceLimit,
+        real_pieces:st==='bloqueado'?0:realPieces,
+        blocked_piece_limit:st==='bloqueado'?pieceLimit:0,
+        blocked_real_pieces:st==='bloqueado'?realPieces:0,
+        available_pieces:st==='bloqueado'?0:Math.max(0,pieceLimit-realPieces),
+        occ_pct:st==='bloqueado'?null:(pieceLimit>0?Math.round((realPieces/pieceLimit)*1000)/10:null)
       });
       if(!metaCalc[zone])metaCalc[zone]={roads:{},levels:{},roadMin:road,roadMax:road};
       metaCalc[zone].roads[road]=true;metaCalc[zone].levels[level]=true;
@@ -217,8 +227,8 @@ window.ExcelImport=(()=>{
     const zones=Object.keys(zoneAgg).sort(zoneSort).map(k=>final(zoneAgg[k]));
     const corridors=Object.keys(roadAgg).map(k=>final(roadAgg[k])).sort((a,b)=>zoneSort(a,b)||a.rua_num-b.rua_num);
     const cells=Object.keys(cellAgg).map(k=>final(cellAgg[k])).sort((a,b)=>zoneSort(a,b)||a.rua_num-b.rua_num||a.nivel-b.nivel);
-    const overall={Zona:'GERAL',rua_num:0,nivel:0,total:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,piece_limit:0,real_pieces:0};
-    zones.forEach(z=>['total','ocupado','disponivel','bloqueado','qtd_pecas','piece_limit','real_pieces'].forEach(k=>overall[k]+=Number(z[k]||0)));
+    const overall={Zona:'GERAL',rua_num:0,nivel:0,total:0,usable_positions:0,ocupado:0,disponivel:0,bloqueado:0,qtd_pecas:0,piece_limit:0,real_pieces:0};
+    zones.forEach(z=>['total','usable_positions','ocupado','disponivel','bloqueado','qtd_pecas','piece_limit','real_pieces'].forEach(k=>overall[k]+=Number(z[k]||0)));
     const meta={};
     const presets={
       A:{label:'Zona A',tipo:'bin'},
@@ -236,8 +246,9 @@ window.ExcelImport=(()=>{
       overall:final(overall),zones,corridors,cells,positions,stock_trend:[],meta,
       assumptions:[
         'Ocupação = soma de Qtds Peças Real ÷ soma de Limite Peças p/Arm.',
-        'Somente as zonas A, B, HV e HS são consideradas.',
-        'Dados importados localmente do Excel.'
+        'Posições bloqueadas são excluídas da capacidade, das peças reais e do percentual de ocupação.',
+        'Capacidade disponível considera somente posições não bloqueadas.',
+        'Somente as zonas A, B, HV e HS são consideradas.'
       ]};
   }
 
