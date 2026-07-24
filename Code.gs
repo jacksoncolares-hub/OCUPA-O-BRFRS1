@@ -1,196 +1,420 @@
 /**
- * PAINEL DE OCUPAÇÃO — BRFRS1 (Google Apps Script)
- * ------------------------------------------------
- * Le a aba "Location" de uma Google Sheet (mesmas colunas do export do WMS:
- * Zona, Location ID, Status End, Qtd Peças, etc.), calcula a ocupação por
- * corredor/nível e envia por e-mail um relatório diário em HTML no estilo
- * do painel (heatmap 2D em tabela + KPIs).
+ * API DO DASHBOARD BRFRS1
+ * Planilha: 19MgaGStYysMHGDcb9o1pK21qdD6i3nb7af5WLOaYWgc
+ * Aba identificada pelo gid: 47098311
  *
- * INSTALAÇÃO
- * 1. Crie uma planilha Google com uma aba "Location" contendo as MESMAS
- *    colunas do arquivo exportado do WMS (cole os dados ali todo dia, ou
- *    conecte via importação/rotina que já exista na empresa).
- * 2. Extensões > Apps Script, cole este arquivo como Code.gs.
- * 3. Ajuste CONFIG abaixo (planilha, destinatários).
- * 4. Rode `configurarGatilhoDiario` uma vez (menu Executar) para autorizar
- *    o script e criar o disparo diário automático.
- * 5. Pronto: todo dia no horário definido, o script recalcula a ocupação
- *    e envia o e-mail.
+ * Publicação:
+ * 1) Extensões > Apps Script
+ * 2) Substitua todo o Code.gs por este conteúdo
+ * 3) Implantar > Nova implantação > Aplicativo da Web
+ * 4) Executar como: Eu
+ * 5) Quem pode acessar: Qualquer pessoa
+ * 6) Copie a URL terminada em /exec
  */
 
-const CONFIG = {
-  SHEET_NAME: 'Location',           // aba com os dados brutos do WMS
-  DESTINATARIOS: 'seuemail@empresa.com', // separar por vírgula para vários
-  ASSUNTO: 'Painel de Ocupação BRFRS1 — Relatório Diário',
-  HORA_ENVIO: 7,                    // hora do dia (0-23) para o disparo diário
-  ZONAS: {
-    'A':  { label: 'Zona A · Bins de Separação', tipo: 'bin' },
-    'HV': { label: 'Zona HV · Bins de Volume',   tipo: 'bin' },
-    'B':  { label: 'Zona B · Porta-Paletes',     tipo: 'pallet' },
-    'S':  { label: 'Zona S · Bins Especiais',    tipo: 'bin' },
+const SETTINGS = {
+  SPREADSHEET_ID: '19MgaGStYysMHGDcb9o1pK21qdD6i3nb7af5WLOaYWgc',
+  SHEET_GID: 47098311,
+  CACHE_SECONDS: 120,
+  ZONE_META: {
+    A:  { label: 'Zona A · Bins de Separação', tipo: 'bin' },
+    B:  { label: 'Zona B · Porta-paletes', tipo: 'pallet' },
+    HV: { label: 'Zona HV · Bins de Volume', tipo: 'bin' },
+    S:  { label: 'Zona S · Bins Especiais', tipo: 'bin' }
   }
 };
 
-/** Cria (ou recria) o gatilho diário. Rode isso uma vez manualmente. */
-function configurarGatilhoDiario() {
-  ScriptApp.getProjectTriggers().forEach(t => {
-    if (t.getHandlerFunction() === 'enviarRelatorioDiario') ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger('enviarRelatorioDiario')
-    .timeBased()
-    .everyDays(1)
-    .atHour(CONFIG.HORA_ENVIO)
-    .create();
-  Logger.log('Gatilho diário configurado às ' + CONFIG.HORA_ENVIO + 'h.');
+function doGet(e) {
+  try {
+    const action = String((e && e.parameter && e.parameter.action) || 'data').toLowerCase();
+
+    if (action === 'diagnostic') {
+      return jsonOutput_(diagnostic_());
+    }
+
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get('BRFRS1_DASHBOARD_DATA_V2');
+    if (cached && !(e && e.parameter && e.parameter.nocache === '1')) {
+      return ContentService
+        .createTextOutput(cached)
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const payload = buildDashboardData_();
+    const json = JSON.stringify(payload);
+    cache.put('BRFRS1_DASHBOARD_DATA_V2', json, SETTINGS.CACHE_SECONDS);
+
+    return ContentService
+      .createTextOutput(json)
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return jsonOutput_({
+      ok: false,
+      error: String(error && error.message ? error.message : error),
+      stack: String(error && error.stack ? error.stack : ''),
+      generated_at: formatDate_(new Date())
+    });
+  }
 }
 
-/** Função principal: lê os dados, agrega e envia o e-mail. Também pode ser rodada manualmente. */
-function enviarRelatorioDiario() {
-  const dados = lerDadosLocation_();
-  const agregados = agregarOcupacao_(dados);
-  const html = montarHtmlRelatorio_(agregados);
+function buildDashboardData_() {
+  const sheet = getTargetSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
 
-  MailApp.sendEmail({
-    to: CONFIG.DESTINATARIOS,
-    subject: CONFIG.ASSUNTO + ' — ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy'),
-    htmlBody: html
-  });
-}
-
-/** Lê a aba Location e devolve um array de objetos (uma linha = um objeto). */
-function lerDadosLocation_() {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEET_NAME);
-  const values = sh.getDataRange().getValues();
-  const headers = values.shift();
-  return values.map(row => {
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
-    return obj;
-  });
-}
-
-/** Agrega ocupação por Zona e por Zona+Corredor+Nível, igual à lógica do dashboard. */
-function agregarOcupacao_(rows) {
-  const porZona = {};      // Zona -> {total,ocupado,disponivel,bloqueado,qtdPecas}
-  const porCorredor = {};  // "Zona|Rua" -> {...}
-
-  rows.forEach(r => {
-    const zona = r['Zona'];
-    if (!CONFIG.ZONAS[zona]) return;
-
-    const locId = String(r['Location ID'] || '');
-    const partes = locId.split('-');
-    if (partes.length < 6) return;
-    const rua = parseInt(partes[2], 10);
-    const posNum = parseInt(partes[5], 10);
-
-    const statusEnd = r['Status End'];
-    const estado = statusEnd === 'Ocupado' ? 'ocupado'
-                 : statusEnd === 'Disponivel' ? 'disponivel'
-                 : statusEnd === 'Bloqueado' ? 'bloqueado' : 'outro';
-
-    const qtdPecas = Number(r['Qtd Peças']) || 0;
-
-    if (!porZona[zona]) porZona[zona] = { total: 0, ocupado: 0, disponivel: 0, bloqueado: 0, qtdPecas: 0 };
-    porZona[zona].total++;
-    porZona[zona][estado] = (porZona[zona][estado] || 0) + 1;
-    porZona[zona].qtdPecas += qtdPecas;
-
-    const key = zona + '|' + rua;
-    if (!porCorredor[key]) porCorredor[key] = { zona, rua, total: 0, ocupado: 0, disponivel: 0, bloqueado: 0 };
-    porCorredor[key].total++;
-    porCorredor[key][estado] = (porCorredor[key][estado] || 0) + 1;
-  });
-
-  function pct(o) {
-    const usable = (o.ocupado || 0) + (o.disponivel || 0);
-    return usable > 0 ? Math.round(1000 * o.ocupado / usable) / 10 : null;
+  if (values.length < 2) {
+    throw new Error('A aba selecionada não possui linhas de dados.');
   }
 
-  const overall = { total: 0, ocupado: 0, disponivel: 0, bloqueado: 0, qtdPecas: 0 };
-  Object.values(porZona).forEach(z => {
-    overall.total += z.total; overall.ocupado += z.ocupado || 0;
-    overall.disponivel += z.disponivel || 0; overall.bloqueado += z.bloqueado || 0;
-    overall.qtdPecas += z.qtdPecas;
-  });
-  overall.pct = pct(overall);
+  const headers = values[0].map(cleanHeader_);
+  const map = mapColumns_(headers);
 
-  const corredoresPorZona = {};
-  Object.values(porCorredor).forEach(c => {
-    if (!corredoresPorZona[c.zona]) corredoresPorZona[c.zona] = [];
-    c.pct = pct(c);
-    corredoresPorZona[c.zona].push(c);
-  });
-  Object.values(corredoresPorZona).forEach(arr => arr.sort((a, b) => a.rua - b.rua));
+  if (map.location < 0) {
+    throw new Error(
+      'Não encontrei a coluna de localização. Cabeçalhos encontrados: ' +
+      values[0].join(' | ')
+    );
+  }
 
-  return { overall, porZona, corredoresPorZona, pct };
+  const zoneAgg = {};
+  const roadAgg = {};
+  const cellAgg = {};
+  const metaCalc = {};
+  let validRows = 0;
+  let ignoredRows = 0;
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (!row.some(v => String(v).trim() !== '')) continue;
+
+    const locationId = String(row[map.location] || '').trim();
+    const parsed = parseLocation_(locationId, map.zone >= 0 ? row[map.zone] : '');
+
+    if (!parsed) {
+      ignoredRows++;
+      continue;
+    }
+
+    const zone = parsed.zone;
+    const road = parsed.road;
+    const level = parsed.level;
+
+    if (!zone || !road || !level) {
+      ignoredRows++;
+      continue;
+    }
+
+    const pieces = map.pieces >= 0 ? parseNumber_(row[map.pieces]) : 0;
+    const rawStatus = map.status >= 0 ? row[map.status] : '';
+    const state = normalizeState_(rawStatus, pieces);
+
+    increment_(zoneAgg, zone, zone, road, level, state, pieces);
+    increment_(roadAgg, zone + '|' + road, zone, road, level, state, pieces);
+    increment_(cellAgg, zone + '|' + road + '|' + level, zone, road, level, state, pieces);
+
+    if (!metaCalc[zone]) {
+      metaCalc[zone] = { roads: {}, levels: {}, roadMin: road, roadMax: road };
+    }
+    metaCalc[zone].roads[road] = true;
+    metaCalc[zone].levels[level] = true;
+    metaCalc[zone].roadMin = Math.min(metaCalc[zone].roadMin, road);
+    metaCalc[zone].roadMax = Math.max(metaCalc[zone].roadMax, road);
+
+    validRows++;
+  }
+
+  const zones = Object.keys(zoneAgg)
+    .sort(zoneSort_)
+    .map(k => finalize_(zoneAgg[k]));
+
+  const corridors = Object.keys(roadAgg)
+    .map(k => finalize_(roadAgg[k]))
+    .sort((a, b) => zoneSort_(a.Zona, b.Zona) || a.rua_num - b.rua_num);
+
+  const cells = Object.keys(cellAgg)
+    .map(k => finalize_(cellAgg[k]))
+    .sort((a, b) =>
+      zoneSort_(a.Zona, b.Zona) ||
+      a.rua_num - b.rua_num ||
+      a.nivel - b.nivel
+    );
+
+  const overallRaw = {
+    Zona: 'GERAL',
+    rua_num: 0,
+    nivel: 0,
+    total: 0,
+    ocupado: 0,
+    disponivel: 0,
+    bloqueado: 0,
+    qtd_pecas: 0
+  };
+
+  zones.forEach(z => {
+    overallRaw.total += z.total;
+    overallRaw.ocupado += z.ocupado;
+    overallRaw.disponivel += z.disponivel;
+    overallRaw.bloqueado += z.bloqueado;
+    overallRaw.qtd_pecas += z.qtd_pecas;
+  });
+
+  const meta = {};
+  Object.keys(metaCalc).forEach(zone => {
+    const calc = metaCalc[zone];
+    const preset = SETTINGS.ZONE_META[zone] || {};
+    meta[zone] = {
+      label: preset.label || ('Zona ' + zone),
+      tipo: preset.tipo || 'bin',
+      ruas: Object.keys(calc.roads).length,
+      niveis: Math.max.apply(null, Object.keys(calc.levels).map(Number)),
+      rua_min: calc.roadMin,
+      rua_max: calc.roadMax
+    };
+  });
+
+  return {
+    ok: true,
+    generated_at: formatDate_(new Date()),
+    source: {
+      spreadsheet_id: SETTINGS.SPREADSHEET_ID,
+      sheet_gid: SETTINGS.SHEET_GID,
+      sheet_name: sheet.getName(),
+      valid_rows: validRows,
+      ignored_rows: ignoredRows
+    },
+    overall: finalize_(overallRaw),
+    zones: zones,
+    corridors: corridors,
+    cells: cells,
+    stock_trend: [],
+    meta: meta,
+    assumptions: [
+      'Ocupação = ocupado ÷ (ocupado + disponível).',
+      'Posições bloqueadas ficam fora do percentual de ocupação.',
+      'A localização é interpretada pelos quatro últimos blocos: zona, rua, nível e posição.'
+    ]
+  };
 }
 
-/** Monta o HTML do e-mail: KPIs + heatmap em tabela (uma célula por corredor, cor = ocupação). */
-function montarHtmlRelatorio_(ag) {
-  const laranja = '#EE4D2D';
-  const dataHoje = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+function diagnostic_() {
+  const sheet = getTargetSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = values.length ? values[0] : [];
+  return {
+    ok: true,
+    spreadsheet_id: SETTINGS.SPREADSHEET_ID,
+    sheet_gid: SETTINGS.SHEET_GID,
+    sheet_name: sheet.getName(),
+    last_row: sheet.getLastRow(),
+    last_column: sheet.getLastColumn(),
+    headers: headers,
+    normalized_headers: headers.map(cleanHeader_),
+    column_mapping: mapColumns_(headers.map(cleanHeader_)),
+    sample_rows: values.slice(1, 6),
+    generated_at: formatDate_(new Date())
+  };
+}
 
-  function corOcupacao(pct) {
-    if (pct === null || pct === undefined) return '#E9EBF1';
-    const stops = [[0,[40,199,111]],[40,[166,226,46]],[65,[255,217,61]],[85,[255,154,61]],[100,[232,67,58]]];
-    let lo = stops[0], hi = stops[stops.length-1];
-    for (let i=0;i<stops.length-1;i++){ if (pct>=stops[i][0] && pct<=stops[i+1][0]){ lo=stops[i]; hi=stops[i+1]; break; } }
-    const span = (hi[0]-lo[0])||1, t = Math.max(0, Math.min(1, (pct-lo[0])/span));
-    const c = lo[1].map((v,i)=>Math.round(v+(hi[1][i]-v)*t));
-    return 'rgb(' + c.join(',') + ')';
+function getTargetSheet_() {
+  const ss = SpreadsheetApp.openById(SETTINGS.SPREADSHEET_ID);
+  const sheet = ss.getSheets().find(s => Number(s.getSheetId()) === Number(SETTINGS.SHEET_GID));
+
+  if (!sheet) {
+    throw new Error(
+      'Não encontrei uma aba com gid ' + SETTINGS.SHEET_GID +
+      '. Abas disponíveis: ' +
+      ss.getSheets().map(s => s.getName() + ' (' + s.getSheetId() + ')').join(', ')
+    );
+  }
+  return sheet;
+}
+
+function mapColumns_(headers) {
+  return {
+    location: findHeader_(headers, [
+      'location id', 'location', 'endereco', 'endereço',
+      'posicao', 'posição', 'storage location', 'bin location'
+    ]),
+    zone: findHeader_(headers, [
+      'zona', 'zone', 'area', 'área'
+    ]),
+    status: findHeader_(headers, [
+      'status end', 'status', 'location status', 'situacao',
+      'situação', 'estado', 'status da posicao', 'status da posição'
+    ]),
+    pieces: findHeader_(headers, [
+      'qtd pecas', 'qtd peças', 'quantidade pecas', 'quantidade peças',
+      'qty', 'quantity', 'pieces', 'unit qty', 'sku qty',
+      'quantidade', 'unidades'
+    ])
+  };
+}
+
+function findHeader_(headers, candidates) {
+  for (let i = 0; i < candidates.length; i++) {
+    const exact = cleanHeader_(candidates[i]);
+    const index = headers.indexOf(exact);
+    if (index >= 0) return index;
   }
 
-  function kpiCard(tag, val, sub, cor) {
-    return '<td style="padding:6px;"><div style="background:#fff;border:1px solid #EDEFF3;border-radius:12px;padding:14px 16px;min-width:130px;">' +
-      '<div style="font-size:10.5px;color:#8A93A6;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">' + tag + '</div>' +
-      '<div style="font-family:Arial,sans-serif;font-size:22px;font-weight:800;color:' + cor + ';margin-top:4px;">' + val + '</div>' +
-      '<div style="font-size:11px;color:#8A93A6;margin-top:2px;">' + sub + '</div></div></td>';
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = cleanHeader_(candidates[i]);
+    const index = headers.findIndex(h => h.indexOf(candidate) >= 0);
+    if (index >= 0) return index;
   }
 
-  const o = ag.overall;
-  const kpisHtml =
-    kpiCard('Posições totais', o.total.toLocaleString('pt-BR'), 'Bins + Porta-paletes', laranja) +
-    kpiCard('Ocupadas', o.ocupado.toLocaleString('pt-BR'), Math.round(1000*o.ocupado/o.total)/10 + '% do total', '#FFB300') +
-    kpiCard('Disponíveis', o.disponivel.toLocaleString('pt-BR'), Math.round(1000*o.disponivel/o.total)/10 + '% do total', '#28C76F') +
-    kpiCard('Bloqueadas', o.bloqueado.toLocaleString('pt-BR'), Math.round(1000*o.bloqueado/o.total)/10 + '% do total', '#E8433A');
+  return -1;
+}
 
-  // Heatmap: uma linha por zona, uma célula por corredor (cor = % ocupação do corredor)
-  let heatRows = '';
-  Object.keys(CONFIG.ZONAS).forEach(zona => {
-    const meta = CONFIG.ZONAS[zona];
-    const corredores = (ag.corredoresPorZona[zona] || []);
-    if (!corredores.length) return;
-    const zpct = ag.porZona[zona] ? ag.pct(ag.porZona[zona]) : null;
-    let cells = corredores.map(c =>
-      '<td title="Rua ' + c.rua + ': ' + (c.pct===null?'-':c.pct+'%') + '" style="width:10px;height:22px;background:' +
-      corOcupacao(c.pct) + ';border-radius:3px;"></td>'
-    ).join('<td style="width:2px;"></td>');
-    heatRows += '<tr>' +
-      '<td style="padding:8px 10px 8px 0;font-size:12px;font-weight:700;color:#1F2430;white-space:nowrap;">' +
-        meta.label + '<br><span style="font-weight:600;color:#8A93A6;">' + (zpct===null?'-':zpct+'%') + '</span></td>' +
-      '<td><table cellpadding="0" cellspacing="0"><tr>' + cells + '</tr></table></td>' +
-      '</tr>';
-  });
+function cleanHeader_(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
-  return `
-  <div style="font-family:Arial,Helvetica,sans-serif;background:#F5F6FA;padding:24px;">
-    <div style="max-width:680px;margin:0 auto;">
-      <div style="background:linear-gradient(100deg,${laranja},#FF9A56);border-radius:16px 16px 0 0;padding:20px 24px;color:#fff;">
-        <div style="font-size:18px;font-weight:800;">📦 Painel de Ocupação de Posições</div>
-        <div style="font-size:12.5px;opacity:.9;margin-top:2px;">BRFRS1 · Relatório diário · ${dataHoje}</div>
-      </div>
-      <div style="background:#fff;padding:20px 24px;">
-        <table cellpadding="0" cellspacing="0"><tr>${kpisHtml}</tr></table>
-      </div>
-      <div style="background:#fff;padding:0 24px 20px;">
-        <div style="font-size:14px;font-weight:800;color:#1F2430;margin-bottom:10px;">Mapa de calor por corredor</div>
-        <table cellpadding="0" cellspacing="0" style="width:100%;">${heatRows}</table>
-        <div style="margin-top:10px;font-size:11px;color:#8A93A6;">Verde = livre · Laranja/Vermelho = cheio. Passe o mouse sobre os blocos para ver o corredor (no Gmail web).</div>
-      </div>
-      <div style="background:#fff;border-radius:0 0 16px 16px;padding:14px 24px;border-top:1px solid #EDEFF3;font-size:11px;color:#8A93A6;">
-        Gerado automaticamente pelo Google Apps Script a partir da planilha "${CONFIG.SHEET_NAME}".
-      </div>
-    </div>
-  </div>`;
+function parseLocation_(locationId, zoneCell) {
+  const raw = String(locationId || '').trim().toUpperCase();
+  if (!raw) return null;
+
+  const parts = raw
+    .replace(/[\/\\|_]+/g, '-')
+    .split('-')
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  let zone = String(zoneCell || '').trim().toUpperCase();
+  let road = null;
+  let level = null;
+
+  // Formato mais comum: A-23-05-018
+  // Também aceita prefixo: BRFRS1-A-23-05-018
+  if (parts.length >= 4) {
+    const tail = parts.slice(-4);
+    if (!zone) zone = tail[0];
+    road = parseInt(tail[1], 10);
+    level = parseInt(tail[2], 10);
+  }
+
+  // Fallback para formatos com zona em outra posição.
+  if ((!zone || !Number.isFinite(road) || !Number.isFinite(level)) && parts.length >= 3) {
+    const zoneIndex = parts.findIndex(p => /^[A-Z]{1,3}$/.test(p));
+    if (zoneIndex >= 0 && parts.length > zoneIndex + 2) {
+      zone = zone || parts[zoneIndex];
+      road = parseInt(parts[zoneIndex + 1], 10);
+      level = parseInt(parts[zoneIndex + 2], 10);
+    }
+  }
+
+  zone = String(zone || '').replace(/[^A-Z0-9]/g, '');
+
+  if (!zone || !Number.isFinite(road) || !Number.isFinite(level)) return null;
+
+  return { zone: zone, road: road, level: level };
+}
+
+function normalizeState_(statusValue, pieces) {
+  const status = cleanHeader_(statusValue);
+
+  if (
+    status.indexOf('bloq') >= 0 ||
+    status.indexOf('block') >= 0 ||
+    status.indexOf('disable') >= 0 ||
+    status.indexOf('inativo') >= 0
+  ) return 'bloqueado';
+
+  if (
+    status.indexOf('ocup') >= 0 ||
+    status.indexOf('occupied') >= 0 ||
+    status.indexOf('full') >= 0 ||
+    status.indexOf('used') >= 0
+  ) return 'ocupado';
+
+  if (
+    status.indexOf('disp') >= 0 ||
+    status.indexOf('avail') >= 0 ||
+    status.indexOf('empty') >= 0 ||
+    status.indexOf('livre') >= 0 ||
+    status.indexOf('vazio') >= 0
+  ) return 'disponivel';
+
+  // Caso o status não seja reconhecido, usa a quantidade como fallback.
+  return Number(pieces || 0) > 0 ? 'ocupado' : 'disponivel';
+}
+
+function increment_(target, key, zone, road, level, state, pieces) {
+  if (!target[key]) {
+    target[key] = {
+      Zona: zone,
+      rua_num: Number(road) || 0,
+      nivel: Number(level) || 0,
+      total: 0,
+      ocupado: 0,
+      disponivel: 0,
+      bloqueado: 0,
+      qtd_pecas: 0
+    };
+  }
+
+  target[key].total++;
+  target[key][state]++;
+  target[key].qtd_pecas += Number(pieces || 0);
+}
+
+function finalize_(obj) {
+  const usable = Number(obj.ocupado || 0) + Number(obj.disponivel || 0);
+  return {
+    Zona: obj.Zona,
+    rua_num: Number(obj.rua_num || 0),
+    nivel: Number(obj.nivel || 0),
+    total: Number(obj.total || 0),
+    ocupado: Number(obj.ocupado || 0),
+    disponivel: Number(obj.disponivel || 0),
+    bloqueado: Number(obj.bloqueado || 0),
+    occ_pct: usable > 0 ? Math.round((1000 * Number(obj.ocupado || 0)) / usable) / 10 : null,
+    qtd_pecas: Math.round(Number(obj.qtd_pecas || 0) * 100) / 100
+  };
+}
+
+function parseNumber_(value) {
+  if (typeof value === 'number') return value;
+  let text = String(value || '').trim();
+  if (!text) return 0;
+
+  text = text.replace(/\s/g, '');
+
+  // Formato brasileiro: 1.234,56
+  if (text.indexOf(',') >= 0) {
+    text = text.replace(/\./g, '').replace(',', '.');
+  } else {
+    text = text.replace(/,/g, '');
+  }
+
+  text = text.replace(/[^\d.\-]/g, '');
+  const number = Number(text);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function zoneSort_(a, b) {
+  const order = { A: 1, B: 2, HV: 3, S: 4 };
+  const za = typeof a === 'string' ? a : a.Zona;
+  const zb = typeof b === 'string' ? b : b.Zona;
+  return (order[za] || 99) - (order[zb] || 99) || String(za).localeCompare(String(zb));
+}
+
+function formatDate_(date) {
+  return Utilities.formatDate(
+    date,
+    Session.getScriptTimeZone() || 'America/Sao_Paulo',
+    'dd/MM/yyyy HH:mm:ss'
+  );
+}
+
+function jsonOutput_(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }
