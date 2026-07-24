@@ -514,3 +514,32 @@ body.modern-dashboard{
 }
 .table-status.blocked{background:#e2e8f0;color:#64748b}
 .position-card.blocked{background:#e2e8f0;border-color:#cbd5e1;color:#64748b}
+
+.modern-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+.percent-kpi{--kpi-color:#2563eb;--kpi-fill:0%;position:relative;min-height:125px;overflow:hidden;padding:17px 18px 15px;border:1px solid #dce4ee;border-radius:18px;background:#fff;text-align:left;color:#0f172a;cursor:pointer;box-shadow:0 12px 32px rgba(15,23,42,.05);transition:.18s}
+.percent-kpi:before{content:"";position:absolute;left:0;right:0;bottom:0;height:var(--kpi-fill);background:linear-gradient(180deg,transparent,rgba(37,99,235,.09));transition:height .35s;pointer-events:none}
+.percent-kpi:after{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--kpi-color)}
+.percent-kpi:hover{transform:translateY(-2px);box-shadow:0 18px 38px rgba(15,23,42,.09)}
+.percent-kpi.active{border-color:var(--kpi-color);box-shadow:0 0 0 2px rgba(37,99,235,.12),0 15px 34px rgba(15,23,42,.08)}
+.percent-kpi.critical{--kpi-color:#ef4444}.percent-kpi.alert{--kpi-color:#f59e0b}.percent-kpi.healthy{--kpi-color:#22c55e}.percent-kpi.idle,.percent-kpi.blocked{--kpi-color:#94a3b8}
+.percent-kpi-top{position:relative;z-index:2;display:flex;justify-content:space-between;gap:10px}
+.percent-kpi-top span{font-size:9px;text-transform:uppercase;letter-spacing:.1em;font-weight:800;color:#64748b}.percent-kpi-top small{font-size:8px;color:#94a3b8}
+.percent-kpi>strong{position:relative;z-index:2;display:block;margin-top:12px;font-size:29px;letter-spacing:-.04em}
+.percent-kpi-meta{position:relative;z-index:2;display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:9px;color:#718096}
+.percent-kpi-track{position:relative;z-index:2;height:6px;margin-top:12px;overflow:hidden;border-radius:99px;background:#e8edf3}.percent-kpi-track i{display:block;width:var(--kpi-fill);height:100%;border-radius:inherit;background:var(--kpi-color)}
+.heat-cell.heat-fill{position:relative;overflow:hidden;isolation:isolate;min-height:68px;background:#eef2f6!important;border-color:#dce4ee!important;color:#334155!important}
+.heat-cell.heat-fill:before{content:"";position:absolute;left:0;right:0;bottom:0;height:var(--heat-fill);z-index:-1;opacity:.92;transition:height .4s}
+.heat-cell.heat-fill.idle:before,.heat-cell.heat-fill.blocked:before{background:linear-gradient(180deg,#dce5ef,#cbd5e1)}
+.heat-cell.heat-fill.healthy:before{background:linear-gradient(180deg,#bbf7d0,#4ade80)}
+.heat-cell.heat-fill.alert:before{background:linear-gradient(180deg,#fde68a,#f59e0b)}
+.heat-cell.heat-fill.critical:before{background:linear-gradient(180deg,#fecaca,#ef4444)}
+.heat-cell-content{position:relative;z-index:2;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-shadow:0 1px 0 rgba(255,255,255,.55)}
+.heat-cell-content strong{font-size:13px!important;color:#0f172a!important}.heat-cell-content span{font-size:9px!important;font-weight:800;color:#334155!important}.heat-cell-content small{font-size:7px;color:#64748b}
+.insight-list{display:grid;gap:9px}.insight-modern{display:grid;grid-template-columns:34px 1fr;align-items:start;gap:10px;padding:11px;border:1px solid #e5eaf1;border-radius:12px;background:#f8fafc;color:#0f172a}
+.insight-modern .insight-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:10px;background:#e8eef8;color:#2563eb;font-weight:900}
+.insight-modern strong{display:block;margin-bottom:4px;font-size:10px;color:#0f172a!important}.insight-modern span{display:block;font-size:8.5px;line-height:1.45;color:#64748b!important}
+.insight-modern.danger{border-left:3px solid #ef4444}.insight-modern.danger .insight-icon{background:#fee2e2;color:#dc2626}
+.insight-modern.warning{border-left:3px solid #f59e0b}.insight-modern.warning .insight-icon{background:#fef3c7;color:#b45309}
+.insight-modern.success{border-left:3px solid #22c55e}.insight-modern.success .insight-icon{background:#dcfce7;color:#15803d}
+.insight-modern.primary{border-left:3px solid #2563eb}.insight-modern.info{border-left:3px solid #0ea5e9}.insight-modern.neutral{border-left:3px solid #94a3b8}
+@media(max-width:1100px){.modern-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.modern-kpis{grid-template-columns:1fr 1fr}}

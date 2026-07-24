@@ -75,15 +75,47 @@ function renderAll(){
 }
 
 function renderKpis(){
-  const z=currentSummary();
-  const a=[
-    ['Ocupação por peças',pct(z.occ_pct),'Qtds Peças Real ÷ Limite Peças p/Arm'],
-    ['Limite de peças',WMS.fmt(z.piece_limit),'capacidade total dos endereços'],
-    ['Quantidade real',WMS.fmt(z.real_pieces),'peças armazenadas atualmente'],
-    ['Capacidade disponível',WMS.fmt(z.available_pieces),'limite restante em peças'],
-    ['Posições',WMS.fmt(z.total),'endereços considerados']
+  const general=aggregateGeneral();
+  const zoneMap=new Map(
+    state.data.zones
+      .filter(z=>ALLOWED_ZONES.includes(String(z.Zona)))
+      .map(z=>[String(z.Zona),z])
+  );
+
+  const cards=[
+    {code:'GERAL',title:'Ocupação geral',value:general.occ_pct,real:general.real_pieces,limit:general.piece_limit,active:state.zone==='GERAL'},
+    ...ALLOWED_ZONES.map(zone=>{
+      const z=zoneMap.get(zone)||{};
+      return{code:zone,title:`Zona ${zone}`,value:z.occ_pct,real:z.real_pieces||0,limit:z.piece_limit||0,active:state.zone===zone};
+    })
   ];
-  $('#kpis').innerHTML=a.map(x=>`<div class="kpi card"><small>${x[0]}</small><strong>${x[1]}</strong><span>${x[2]}</span></div>`).join('');
+
+  $('#kpis').innerHTML=cards.map(card=>{
+    const level=Math.max(0,Math.min(100,Number(card.value)||0));
+    return`
+      <button class="percent-kpi ${WMS.cls(card.value)} ${card.active?'active':''}"
+              data-kpi-zone="${card.code}" style="--kpi-fill:${level}%">
+        <div class="percent-kpi-top">
+          <span>${card.title}</span>
+          <small>${card.code==='GERAL'?'Todas':card.code}</small>
+        </div>
+        <strong>${pct(card.value)}</strong>
+        <div class="percent-kpi-meta">
+          <span>${WMS.fmt(card.real)} peças</span>
+          <span>de ${WMS.fmt(card.limit)}</span>
+        </div>
+        <div class="percent-kpi-track"><i></i></div>
+      </button>`;
+  }).join('');
+
+  document.querySelectorAll('[data-kpi-zone]').forEach(btn=>{
+    btn.onclick=()=>{
+      state.zone=btn.dataset.kpiZone;
+      $('#zoneSelect').value=state.zone;
+      state.selected=null;
+      renderAll();
+    };
+  });
 }
 
 function renderHeat(){
@@ -121,17 +153,15 @@ function renderHeat(){
     const td=levels.map(level=>{
       const c=cellMap.get(`${zone}|${road}|${level}`);
       return c
-        ?`<td class="heat-cell ${WMS.cls(c.occ_pct)}" data-z="${zone}" data-r="${road}" data-l="${level}">
-            <strong>${pct(c.occ_pct)}</strong>
-            <span>${WMS.fmt(c.real_pieces)} / ${WMS.fmt(c.piece_limit)} peças</span>
+        ?`<td class="heat-cell heat-fill ${WMS.cls(c.occ_pct)}" style="--heat-fill:${Math.max(0,Math.min(100,Number(c.occ_pct)||0))}%" data-z="${zone}" data-r="${road}" data-l="${level}">
+            <div class="heat-cell-content"><strong>${pct(c.occ_pct)}</strong><span>${WMS.fmt(c.real_pieces)} peças</span><small>Limite ${WMS.fmt(c.piece_limit)}</small></div>
           </td>`
         :`<td class="heat-cell blocked"><strong>—</strong><span>sem dado</span></td>`;
     }).join('');
 
     const total=roadData
-      ?`<td class="heat-cell ${WMS.cls(roadData.occ_pct)}" data-z="${zone}" data-r="${road}" data-l="0">
-          <strong>${pct(roadData.occ_pct)}</strong>
-          <span>${WMS.fmt(roadData.real_pieces)} / ${WMS.fmt(roadData.piece_limit)} peças</span>
+      ?`<td class="heat-cell heat-fill ${WMS.cls(roadData.occ_pct)}" style="--heat-fill:${Math.max(0,Math.min(100,Number(roadData.occ_pct)||0))}%" data-z="${zone}" data-r="${road}" data-l="0">
+          <div class="heat-cell-content"><strong>${pct(roadData.occ_pct)}</strong><span>${WMS.fmt(roadData.real_pieces)} peças</span><small>Limite ${WMS.fmt(roadData.piece_limit)}</small></div>
         </td>`
       :'<td></td>';
 
@@ -160,15 +190,25 @@ function renderRanking(){
 
 function renderInsights(){
   const rs=roads().filter(r=>r.occ_pct!=null);
-  const crit=rs.filter(r=>r.occ_pct>=90);
-  const free=rs.slice().sort((a,b)=>(a.occ_pct??999)-(b.occ_pct??999))[0];
+  const critical=rs.filter(r=>r.occ_pct>=90);
+  const attention=rs.filter(r=>r.occ_pct>=75&&r.occ_pct<90);
+  const highest=rs.slice().sort((a,b)=>(b.occ_pct??-1)-(a.occ_pct??-1))[0];
+  const lowestWithStock=rs.filter(r=>Number(r.real_pieces)>0).sort((a,b)=>(a.occ_pct??999)-(b.occ_pct??999))[0];
   const summary=currentSummary();
-  const a=[
-    crit.length?`${crit.length} rua(s) acima de 90% de ocupação volumétrica.`:'Nenhuma rua crítica acima de 90%.',
-    free?`Maior folga: ${state.zone==='GERAL'?`Zona ${free.Zona} · `:''}Rua ${pad(free.rua_num)} com ${pct(free.occ_pct)}.`:'Sem dados para folga.',
-    `${WMS.fmt(summary.available_pieces)} peças de capacidade disponível.`
+
+  const items=[
+    {icon:'!',title:critical.length?`${critical.length} rua(s) críticas`:'Nenhuma rua crítica',text:critical.length?'Ocupação acima de 90% exige atenção imediata.':'Nenhuma rua está acima de 90%.',type:critical.length?'danger':'success'},
+    {icon:'↗',title:highest?`Maior ocupação: ${pct(highest.occ_pct)}`:'Sem dados',text:highest?`${state.zone==='GERAL'?`Zona ${highest.Zona} · `:''}Rua ${pad(highest.rua_num)} com ${WMS.fmt(highest.real_pieces)} peças.`:'Não há ruas disponíveis.',type:'primary'},
+    {icon:'◔',title:attention.length?`${attention.length} rua(s) em atenção`:'Sem ruas em atenção',text:attention.length?'Faixa entre 75% e 89,9% de ocupação.':'Nenhuma rua está na faixa de atenção.',type:'warning'},
+    {icon:'↓',title:lowestWithStock?`Menor ocupação com estoque: ${pct(lowestWithStock.occ_pct)}`:'Sem estoque',text:lowestWithStock?`${state.zone==='GERAL'?`Zona ${lowestWithStock.Zona} · `:''}Rua ${pad(lowestWithStock.rua_num)} possui ${WMS.fmt(lowestWithStock.real_pieces)} peças.`:'Nenhuma rua com estoque encontrada.',type:'neutral'},
+    {icon:'□',title:`${WMS.fmt(summary.available_pieces)} peças disponíveis`,text:'Capacidade restante considerando o limite informado.',type:'info'}
   ];
-  $('#insights').innerHTML=a.map(t=>`<div class="insight">${t}</div>`).join('');
+
+  $('#insights').innerHTML=items.map(item=>`
+    <div class="insight-modern ${item.type}">
+      <div class="insight-icon">${item.icon}</div>
+      <div><strong>${item.title}</strong><span>${item.text}</span></div>
+    </div>`).join('');
 }
 
 function select(zone,road,level){
