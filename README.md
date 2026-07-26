@@ -1,4 +1,18 @@
-# BRFRS1 Occupancy Center — Google Sheets + Importação Manual de Excel
+# BRFRS1 Occupancy Center
+
+## Publicação com Google Sheets (obrigatório)
+
+1. Abra a planilha configurada e vá em **Extensões > Apps Script**.
+2. Substitua o conteúdo por `Code.gs` deste repositório e salve.
+3. Em **Implantar > Nova implantação**, selecione **Aplicativo da Web**.
+4. Execute como você e permita acesso para qualquer pessoa com o link.
+5. Copie a URL terminada em `/exec` e cole em `config.js`, no campo `SHEET_API_URL`.
+6. Abra `SUA_URL_EXEC?action=diagnostic`: a resposta deve exibir o mapeamento das colunas e amostras da aba.
+7. Faça o commit de `config.js` e publique no GitHub Pages.
+
+O dashboard usa o Google Sheets como fonte oficial. A importação de Excel é somente uma contingência local e não atualiza os dados dos outros usuários.
+
+O Apps Script aceita o padrão de endereço `BRFRS1-A-23-05-3-018`, calcula ocupação por `Qtds Peças Real ÷ Limite Peças p/Arm` e exclui posições bloqueadas do cálculo.
 
 ## Fontes de dados
 1. Google Sheets via Apps Script: atualização automática.

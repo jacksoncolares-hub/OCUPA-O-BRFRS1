@@ -69,13 +69,14 @@ window.WMS=(()=>{
     }
 
     const u=(c.SHEET_API_URL||'').trim();
-    const src=u?`${u}${u.includes('?')?'&':'?'}${force?'nocache=1&':''}t=${Date.now()}`:'data.json';
+    if(!u)throw new Error('Fonte Google Sheets não configurada. Publique o Code.gs como Aplicativo da Web e cole a URL /exec em config.js.');
+    const src=`${u}${u.includes('?')?'&':'?'}${force?'nocache=1&':''}t=${Date.now()}`;
     const r=await fetch(src,{cache:'no-store'});
     if(!r.ok)throw new Error(`HTTP ${r.status}`);
     cache=normalize(await r.json());
     sourceInfo={
-      type:u?'sheets':'local',
-      label:u?'Google Sheets':'Arquivo local',
+      type:'sheets',
+      label:'Google Sheets',
       updatedAt:cache.generated_at||new Date().toISOString(),
       fileName:null
     };

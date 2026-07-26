@@ -1,6 +1,7 @@
 window.APP_CONFIG = {
-  // Cole a URL do Apps Script terminada em /exec.
-  SHEET_API_URL: "",
+  // Cole a URL da implantação do Apps Script terminada em /exec.
+  // Exemplo: https://script.google.com/macros/s/SEU_ID/exec
+  SHEET_API_URL: "https://script.google.com/a/macros/shopee.com/s/AKfycbyFSOWI9M-46qzGSUQ3xIRtj6fZFurOfSUk2s81LORGgSRUdDBEWVJOY2kjbhPv5B5_oA/exec",
   REFRESH_MS: 120000,
   DEFAULT_ZONE: "B",
 

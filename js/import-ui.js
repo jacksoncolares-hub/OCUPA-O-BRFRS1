@@ -77,6 +77,7 @@
     setProgress(2,'Preparando importação');
 
     try{
+      await ensureXlsx();
       const out=await ExcelImport.read(selectedFile,{
         onProgress:(pct,text)=>setProgress(pct,text)
       });
@@ -179,6 +180,17 @@
     if(bytes<1024)return`${bytes} B`;
     if(bytes<1048576)return`${(bytes/1024).toFixed(1)} KB`;
     return`${(bytes/1048576).toFixed(1)} MB`;
+  }
+
+  function ensureXlsx(){
+    if(window.XLSX)return Promise.resolve();
+    return new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      script.onload=resolve;
+      script.onerror=()=>reject(new Error('Não foi possível carregar o leitor de Excel. Verifique a internet e tente novamente.'));
+      document.head.appendChild(script);
+    });
   }
 
   window.updateSourceBadge=window.updateSourceBadge||function(){};
