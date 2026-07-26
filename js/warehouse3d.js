@@ -18,6 +18,7 @@ async function init() {
     data = await WMS.load();
     if (!WMS.zones(data).length) throw new Error('A fonte não possui dados. Configure a URL do Apps Script em config.js.');
     setupUi(); setupScene(); renderWarehouse();
+    setInterval(refreshData, WMS.config.REFRESH_MS || 900000);
     const source = WMS.getSourceInfo();
     status('ok', source.type === 'sheets' ? 'Google Sheets conectado' : source.label);
     setTimeout(() => window.updateSourceBadge?.(), 0);
@@ -25,6 +26,15 @@ async function init() {
     console.error(error); status('error', 'Falha ao carregar');
     $('#viewerInfo').textContent = error.message;
   }
+}
+
+async function refreshData() {
+  try {
+    data = await WMS.load(true);
+    const zones = WMS.zones(data);
+    if (!zones.includes(zone)) { zone = zones[0]; $('#zoneSelect').value = zone; fillLevels(); hasCameraPosition = false; }
+    renderWarehouse(); status('ok', 'Google Sheets atualizado');
+  } catch (error) { console.error(error); status('error', 'Falha ao atualizar'); }
 }
 
 function setupUi() {

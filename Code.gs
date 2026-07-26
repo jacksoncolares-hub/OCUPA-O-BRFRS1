@@ -7,7 +7,8 @@
 const SETTINGS = {
   SPREADSHEET_ID: '19MgaGStYysMHGDcb9o1pK21qdD6i3nb7af5WLOaYWgc',
   SHEET_GID: 47098311,
-  CACHE_SECONDS: 60,
+  // Evita releituras desnecessárias da planilha entre as atualizações do dashboard.
+  CACHE_SECONDS: 900,
   ALLOWED_ZONES: ['A', 'B', 'HV', 'HS'],
   ZONE_META: {
     A: { label: 'Zona A', tipo: 'bin' },
