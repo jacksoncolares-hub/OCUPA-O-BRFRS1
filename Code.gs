@@ -18,6 +18,15 @@ const SETTINGS = {
   }
 };
 
+const GITHUB = {
+  API_BASE: 'https://api.github.com',
+  DEFAULT_OWNER: 'jacksoncolares-hub',
+  DEFAULT_REPOSITORY: 'OCUPA-O-BRFRS1',
+  DEFAULT_BRANCH: 'main',
+  DEFAULT_PATH: 'data.json',
+  TRIGGER_HANDLER: 'publishSnapshotToGitHub'
+};
+
 function doGet(e) {
   try {
     const action = String((e && e.parameter && e.parameter.action) || 'data').toLowerCase();
@@ -36,6 +45,79 @@ function doGet(e) {
   } catch (error) {
     return output_({ ok: false, error: String(error.message || error), generated_at: timestamp_() });
   }
+}
+
+/**
+ * Gera o snapshot da planilha e atualiza data.json no GitHub.
+ * Execute manualmente uma vez para autorizar e testar; depois use o gatilho.
+ * O token nunca deve ser escrito no código: use Propriedades do Script.
+ */
+function publishSnapshotToGitHub() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return { ok: false, skipped: true, reason: 'Outra publicação já está em andamento.' };
+  try {
+    const settings = githubSettings_();
+    const snapshot = buildDashboardData_();
+    // Evita expor o ID interno da planilha no repositório publicado.
+    snapshot.source = {
+      type: 'github_snapshot',
+      generated_by: 'Google Apps Script',
+      sheet_name: snapshot.source.sheet_name,
+      valid_rows: snapshot.source.valid_rows,
+      ignored_rows: snapshot.source.ignored_rows
+    };
+    snapshot.published_at = timestamp_();
+    const result = putGitHubFile_(settings, JSON.stringify(snapshot));
+    console.log('Snapshot publicado em ' + result.html_url);
+    return { ok: true, path: settings.path, url: result.html_url, generated_at: snapshot.generated_at };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Execute uma única vez no editor Apps Script para criar o gatilho de 15 minutos. */
+function installSnapshotTrigger() {
+  removeSnapshotTrigger();
+  ScriptApp.newTrigger(GITHUB.TRIGGER_HANDLER).timeBased().everyMinutes(15).create();
+  return publishSnapshotToGitHub();
+}
+
+/** Remove apenas o gatilho de publicação deste dashboard. */
+function removeSnapshotTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter(trigger => trigger.getHandlerFunction() === GITHUB.TRIGGER_HANDLER)
+    .forEach(trigger => ScriptApp.deleteTrigger(trigger));
+}
+
+function githubSettings_() {
+  const props = PropertiesService.getScriptProperties();
+  const token = String(props.getProperty('GITHUB_TOKEN') || '').trim();
+  if (!token) throw new Error('Defina GITHUB_TOKEN nas Propriedades do Script antes de publicar.');
+  return {
+    token: token,
+    owner: String(props.getProperty('GITHUB_OWNER') || GITHUB.DEFAULT_OWNER).trim(),
+    repository: String(props.getProperty('GITHUB_REPOSITORY') || GITHUB.DEFAULT_REPOSITORY).trim(),
+    branch: String(props.getProperty('GITHUB_BRANCH') || GITHUB.DEFAULT_BRANCH).trim(),
+    path: String(props.getProperty('GITHUB_DATA_PATH') || GITHUB.DEFAULT_PATH).trim()
+  };
+}
+
+function putGitHubFile_(settings, text) {
+  const apiPath = '/repos/' + encodeURIComponent(settings.owner) + '/' + encodeURIComponent(settings.repository) + '/contents/' + settings.path.split('/').map(encodeURIComponent).join('/');
+  const url = GITHUB.API_BASE + apiPath;
+  const headers = { Authorization: 'Bearer ' + settings.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  const existing = UrlFetchApp.fetch(url + '?ref=' + encodeURIComponent(settings.branch), { headers: headers, muteHttpExceptions: true });
+  const code = existing.getResponseCode();
+  if (code !== 200 && code !== 404) throw new Error('Não consegui ler data.json no GitHub (HTTP ' + code + '): ' + existing.getContentText().slice(0, 300));
+  const body = {
+    message: 'chore: atualiza snapshot de ocupação',
+    content: Utilities.base64Encode(Utilities.newBlob(text, 'application/json').getBytes()),
+    branch: settings.branch
+  };
+  if (code === 200) body.sha = JSON.parse(existing.getContentText()).sha;
+  const response = UrlFetchApp.fetch(url, { method: 'put', headers: headers, contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) throw new Error('Não consegui atualizar data.json no GitHub (HTTP ' + response.getResponseCode() + '): ' + response.getContentText().slice(0, 500));
+  return JSON.parse(response.getContentText()).content;
 }
 
 function buildDashboardData_() {

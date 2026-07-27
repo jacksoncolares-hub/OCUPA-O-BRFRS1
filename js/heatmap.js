@@ -36,7 +36,7 @@ async function load(force=false){
 
     renderAll();
     const src=WMS.getSourceInfo();
-    status('ok',src.type==='excel'?'Excel manual carregado':(WMS.config.SHEET_API_URL?'Google Sheets conectado':'Modo local'));
+    status('ok',src.type==='excel'?'Excel manual carregado':src.label);
     updateMainSourceBadge();
   }catch(e){
     console.error(e);

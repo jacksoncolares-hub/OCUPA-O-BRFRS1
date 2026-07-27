@@ -1,5 +1,7 @@
 # BRFRS1 Occupancy Center
 
+> Modo atual: o navegador lê `data.json` do GitHub. Não preencha `SHEET_API_URL`; o Apps Script publica o snapshot automaticamente a cada 15 minutos.
+
 ## Publicação com Google Sheets (obrigatório)
 
 1. Abra a planilha configurada e vá em **Extensões > Apps Script**.
@@ -13,6 +15,17 @@
 O dashboard usa o Google Sheets como fonte oficial. A importação de Excel é somente uma contingência local e não atualiza os dados dos outros usuários.
 
 O Apps Script aceita o padrão de endereço `BRFRS1-A-23-05-3-018`, calcula ocupação por `Qtds Peças Real ÷ Limite Peças p/Arm` e exclui posições bloqueadas do cálculo.
+
+## Atualização automática Google Sheets → GitHub
+
+O GitHub Pages lê `data.json` localmente. Para o Apps Script publicar esse arquivo a cada 15 minutos:
+
+1. No GitHub, crie um **fine-grained personal access token** com acesso somente ao repositório e permissão **Contents: Read and write**.
+2. No Apps Script, abra **Configurações do projeto > Propriedades do script** e adicione `GITHUB_TOKEN` com o token. Opcionalmente, adicione `GITHUB_OWNER`, `GITHUB_REPOSITORY`, `GITHUB_BRANCH` e `GITHUB_DATA_PATH`; os valores padrão são este repositório, `main` e `data.json`.
+3. No editor Apps Script, execute `installSnapshotTrigger` uma vez e conceda as permissões. A função já publica o primeiro snapshot e cria o gatilho de 15 minutos.
+4. Para testar uma atualização manual, execute `publishSnapshotToGitHub`.
+
+Nunca registre o token em `config.js`, `Code.gs` ou no GitHub.
 
 ## Fontes de dados
 1. Google Sheets via Apps Script: atualização automática.

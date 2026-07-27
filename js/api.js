@@ -69,14 +69,17 @@ window.WMS=(()=>{
     }
 
     const u=(c.SHEET_API_URL||'').trim();
-    if(!u)throw new Error('Fonte Google Sheets não configurada. Publique o Code.gs como Aplicativo da Web e cole a URL /exec em config.js.');
-    const src=`${u}${u.includes('?')?'&':'?'}${force?'nocache=1&':''}t=${Date.now()}`;
+    // O modo padrão usa o snapshot data.json publicado pelo Apps Script no GitHub.
+    // Isso evita depender da sessão Google de cada visitante do Pages.
+    const src=u
+      ?`${u}${u.includes('?')?'&':'?'}${force?'nocache=1&':''}t=${Date.now()}`
+      :`data.json${force?'?t='+Date.now():''}`;
     const r=await fetch(src,{cache:'no-store'});
     if(!r.ok)throw new Error(`HTTP ${r.status}`);
     cache=normalize(await r.json());
     sourceInfo={
-      type:'sheets',
-      label:'Google Sheets',
+      type:u?'sheets':'github',
+      label:u?'Google Sheets':'Snapshot do GitHub',
       updatedAt:cache.generated_at||new Date().toISOString(),
       fileName:null
     };
